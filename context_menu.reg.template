@@ -1,0 +1,96 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================
+; ConvTool v1 — menu klik kanan Windows Explorer.
+; File ini TEMPLATE: install.bat mengganti __INSTALLDIR__ dengan
+; folder install sebenarnya (mis. C:\\Tools\\ConvTool) lalu
+; menjalankan: reg import ConvTool_context_menu.reg
+; JANGAN edit file ini langsung untuk install — jalankan install.bat.
+; ============================================================
+
+; ---------- Perintah (CommandStore, supaya bisa dipakai ulang) ----------
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.Resize]
+@="Resize Pictures"
+"MUIVerb"="Resize Pictures"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.Resize\command]
+@="\"__INSTALLDIR__\\ConvTool.exe\" resize-image \"%1\""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.ImagesToPdf]
+@="Images to PDF"
+"MUIVerb"="Images to PDF"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.ImagesToPdf\command]
+@="\"__INSTALLDIR__\\ConvTool.exe\" images-to-pdf \"%1\""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.Exif]
+@="Edit EXIF"
+"MUIVerb"="Edit EXIF"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.Exif\command]
+@="\"__INSTALLDIR__\\ConvTool.exe\" exif \"%1\""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.WatermarkKlasik]
+@="Watermark Klasik"
+"MUIVerb"="Watermark Klasik"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.WatermarkKlasik\command]
+@="\"__INSTALLDIR__\\ConvTool.exe\" watermark-klasik \"%1\""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.WatermarkJob]
+@="Watermark Job"
+"MUIVerb"="Watermark Job"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.WatermarkJob\command]
+@="\"__INSTALLDIR__\\ConvTool.exe\" watermark-job \"%1\""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.ResizePdf]
+@="Resize PDF"
+"MUIVerb"="Resize PDF"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.ResizePdf\command]
+@="\"__INSTALLDIR__\\ConvTool.exe\" resize-pdf \"%1\""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.PdfToImages]
+@="PDF to Images"
+"MUIVerb"="PDF to Images"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.PdfToImages\command]
+@="\"__INSTALLDIR__\\ConvTool.exe\" pdf-to-images \"%1\""
+
+; ---------- Submenu "ConvTool" untuk file gambar ----------
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.jpg\shell\ConvTool]
+"MUIVerb"="ConvTool"
+"SubCommands"="ConvTool.Resize;ConvTool.ImagesToPdf;ConvTool.Exif;ConvTool.WatermarkKlasik;ConvTool.WatermarkJob"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.jpeg\shell\ConvTool]
+"MUIVerb"="ConvTool"
+"SubCommands"="ConvTool.Resize;ConvTool.ImagesToPdf;ConvTool.Exif;ConvTool.WatermarkKlasik;ConvTool.WatermarkJob"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.png\shell\ConvTool]
+"MUIVerb"="ConvTool"
+"SubCommands"="ConvTool.Resize;ConvTool.ImagesToPdf;ConvTool.Exif;ConvTool.WatermarkKlasik;ConvTool.WatermarkJob"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.webp\shell\ConvTool]
+"MUIVerb"="ConvTool"
+"SubCommands"="ConvTool.Resize;ConvTool.ImagesToPdf;ConvTool.Exif;ConvTool.WatermarkKlasik;ConvTool.WatermarkJob"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
+
+; ---------- Submenu "ConvTool" untuk file PDF ----------
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.pdf\shell\ConvTool]
+"MUIVerb"="ConvTool"
+"SubCommands"="ConvTool.ResizePdf;ConvTool.PdfToImages"
+"Icon"="__INSTALLDIR__\\ConvTool.exe"
