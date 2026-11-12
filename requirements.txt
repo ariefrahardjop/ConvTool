@@ -1,2 +1,10 @@
 Pillow>=10.0
-PyMuPDF>=1.24
+# PyMuPDF DIPIN 1.28.2 — JANGAN naikkan ke >=1.24 lagi:
+# PC Windows ARM64 (Snapdragon) + Python 3.11 tidak punya wheel
+# untuk PyMuPDF 2.x (tidak ada wheel win_arm64 sama sekali), dan
+# untuk Python 3.11 ARM64 tidak ada wheel di versi mana pun.
+# Akibatnya pip jatuh ke source tarball dan mencoba meng-compile
+# MuPDF dari source (butuh Visual Studio 2022) lalu gagal.
+# 1.28.2 adalah SATU-SATUNYA versi dengan wheel win_arm64
+# (cp310-abi3, cocok untuk Python 3.10+ termasuk 3.11).
+PyMuPDF==1.28.2

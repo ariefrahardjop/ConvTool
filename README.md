@@ -1,4 +1,4 @@
-# ConvTool v1.8
+# ConvTool v1.8.1
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,19 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Perubahan v1.8.1 (12 Nov 2026)
+
+- **Perbaikan instalasi di Windows ARM64 (Snapdragon):** PyMuPDF
+  dipin ke `==1.28.2`. `requirements.txt` lama (`PyMuPDF>=1.24`)
+  membuat pip mengambil 2.1, yang tidak punya wheel untuk
+  `win_arm64` — pip lalu jatuh ke source tarball dan mencoba
+  meng-compile MuPDF dari source, gagal karena Visual Studio 2022
+  tidak terpasang. 1.28.2 adalah satu-satunya versi dengan wheel
+  `win_arm64` (cp310-abi3, cocok untuk Python 3.10+, termasuk 3.11).
+  Aplikasi sendiri tidak berubah; bila sudah terinstal, tidak perlu
+  build ulang dari zip ini — cukup `pip install "PyMuPDF==1.28.2"`
+  lalu jalankan `build.bat` lagi.
 
 ## Perubahan v1.8 (11 Nov 2026)
 
