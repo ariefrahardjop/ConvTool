@@ -38,6 +38,20 @@ PRESET_ORDER = ["Small", "Medium", "Large", "Phone", "Custom"]
 
 JPEG_QUALITY_DEFAULT = 90
 
+# Preset Resize PDF — BUKAN ukuran piksel halaman, melainkan tingkat
+# kompresi file (DPI render x kualitas JPEG). PDF yang "di-resize"
+# adalah PDF yang ukuran filenya mengecil; halaman hasil render
+# mempertahankan aspek aslinya (lebar/tinggi mengikuti DPI).
+#   Small  — 100 DPI, JPEG q55: file paling kecil, cukup untuk layar
+#   Medium — 150 DPI, JPEG q70: seimbang antara ukuran dan kualitas
+#   Large  — 200 DPI, JPEG q85: kualitas paling dekat aslinya
+PDF_RESIZE_PRESETS = {
+    "Small":  (100, 55),
+    "Medium": (150, 70),
+    "Large":  (200, 85),
+}
+PDF_RESIZE_ORDER = ["Small", "Medium", "Large"]
+
 # ---------------------------------------------------------------- util
 
 
@@ -952,23 +966,34 @@ def pdf_to_images(pdf_path, out_dir, base_name, longest_px, fmt="PNG"):
     return out
 
 
-def resize_pdf(pdf_path, output_path, target_w_px, target_h_px):
-    """Buat PDF baru: tiap halaman jadi berukuran target (px pada 96 DPI
-    -> point = px * 72 / 96), konten diskalakan agar muat dan diletakkan
-    di tengah halaman. Konten tidak pernah diperbesar (skala maks 1,0).
-    Mengembalikan jumlah halaman."""
-    tw_pt = target_w_px * 72.0 / 96.0
-    th_pt = target_h_px * 72.0 / 96.0
+def resize_pdf(pdf_path, output_path, preset="Medium"):
+    """Buat PDF baru yang ukuran filenya lebih kecil: tiap halaman
+    di-render jadi gambar JPEG pada DPI + kualitas preset, lalu
+    disusun kembali jadi PDF dengan aspek halaman dipertahankan.
+
+    preset: "Small" (100 DPI, JPEG q55 — file paling kecil),
+    "Medium" (150 DPI, JPEG q70), atau "Large" (200 DPI, JPEG q85 —
+    kualitas paling dekat aslinya). Ukuran hasil selalu berurutan:
+    Small < Medium < Large.
+
+    Catatan: halaman hasil adalah gambar — teks di PDF tidak bisa
+    diseleksi lagi. Mengembalikan jumlah halaman."""
+    if preset not in PDF_RESIZE_PRESETS:
+        raise ValueError("preset Resize PDF tidak dikenal: %r "
+                         "(pilih: Small, Medium, Large)" % preset)
+    dpi, quality = PDF_RESIZE_PRESETS[preset]
+    zoom = dpi / 72.0
     src = pymupdf.open(pdf_path)
     dst = pymupdf.open()
     for page in src:
-        scale = min(tw_pt / page.rect.width, th_pt / page.rect.height, 1.0)
-        cw, ch = page.rect.width * scale, page.rect.height * scale
-        newpage = dst.new_page(width=tw_pt, height=th_pt)
-        x0 = (tw_pt - cw) / 2.0
-        y0 = (th_pt - ch) / 2.0
-        newpage.show_pdf_page(pymupdf.Rect(x0, y0, x0 + cw, y0 + ch),
-                              src, page.number)
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom))
+        data = pix.tobytes("jpeg", jpg_quality=quality)
+        # Ukuran halaman dari pixmap (sudah memperhitungkan rotasi).
+        w_pt = pix.width * 72.0 / dpi
+        h_pt = pix.height * 72.0 / dpi
+        newpage = dst.new_page(width=w_pt, height=h_pt)
+        newpage.insert_image(pymupdf.Rect(0, 0, w_pt, h_pt),
+                             stream=data)
     dst.save(output_path, garbage=4, deflate=True)
     count = len(dst)
     src.close()

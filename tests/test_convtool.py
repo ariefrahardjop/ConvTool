@@ -134,25 +134,56 @@ def test_pdf_roundtrip():
 
 def test_resize_pdf():
     print("\n== resize_pdf ==")
+    import random
     import pymupdf
-    src = os.path.join(WORK, "a4.pdf")
+    # PDF 2 halaman dari foto berisik (mirip foto asli): file aslinya
+    # besar, jadi kompresi harus terlihat jelas di ukuran byte.
+    random.seed(7)
+    im = Image.new("RGB", (2400, 1800))
+    px = im.load()
+    for y in range(0, 1800, 4):
+        for x in range(0, 2400, 4):
+            c = (random.randint(0, 255), random.randint(0, 255),
+                 random.randint(0, 255))
+            for dy in range(4):
+                for dx in range(4):
+                    px[x + dx, y + dy] = c
+    jpg = os.path.join(WORK, "foto.jpg")
+    im.save(jpg, "JPEG", quality=92)
+    src = os.path.join(WORK, "besar.pdf")
     doc = pymupdf.open()
-    page = doc.new_page(width=842, height=595)  # A4 landscape (point)
-    page.insert_text((100, 100), "Halo ConvTool", fontsize=40)
+    for _ in range(2):
+        page = doc.new_page(width=842, height=595)
+        page.insert_image(page.rect, filename=jpg)
     doc.save(src)
     doc.close()
-    # Target Small 854x480 px -> 640.5 x 360 pt.
-    dst = core.output_path_for_resize(src, "Small", ".pdf")
-    n = core.resize_pdf(src, dst, 854, 480)
-    check("resize_pdf 1 halaman", n == 1, "")
-    d2 = pymupdf.open(dst)
-    r = d2[0].rect
-    d2.close()
-    check("resize_pdf ukuran halaman = target",
-          abs(r.width - 640.5) < 0.6 and abs(r.height - 360) < 0.6,
-          "%.1f x %.1f pt" % (r.width, r.height))
-    check("resize_pdf nama file",
-          os.path.basename(dst) == "a4 (Small).pdf", dst)
+    orig_size = os.path.getsize(src)
+    sizes = {}
+    for preset in core.PDF_RESIZE_ORDER:
+        dst = core.output_path_for_resize(src, preset, ".pdf")
+        n = core.resize_pdf(src, dst, preset)
+        check("resize_pdf %s 2 halaman" % preset, n == 2, "")
+        d2 = pymupdf.open(dst)
+        n_pages = len(d2)
+        d2.close()
+        check("resize_pdf %s halaman utuh" % preset, n_pages == 2, "")
+        check("resize_pdf nama file %s" % preset,
+              os.path.basename(dst) == "besar (%s).pdf" % preset, dst)
+        sizes[preset] = os.path.getsize(dst)
+    # Inti laporan user: ukuran hasil HARUS mengecil (cara lama
+    # show_pdf_page menyalin gambar asli utuh -> ukuran tetap sama).
+    check("resize_pdf Small < asli", sizes["Small"] < orig_size,
+          "%d < %d" % (sizes["Small"], orig_size))
+    check("resize_pdf Small < Medium < Large",
+          sizes["Small"] < sizes["Medium"] < sizes["Large"],
+          str(sizes))
+    check("resize_pdf Large < asli", sizes["Large"] < orig_size,
+          "%d < %d" % (sizes["Large"], orig_size))
+    try:
+        core.resize_pdf(src, os.path.join(WORK, "x.pdf"), "Raksasa")
+        check("resize_pdf preset salah ditolak", False, "tidak raise")
+    except ValueError:
+        check("resize_pdf preset salah ditolak", True, "")
 
 
 def test_exif_roundtrip():

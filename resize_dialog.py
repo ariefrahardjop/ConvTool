@@ -6,8 +6,10 @@
 #
 # Gambar: hasil default file BARU "nama (Small).jpg" dst; checkbox
 # "Resize the original pictures" bila ON menimpa file asli.
-# PDF: tiap halaman diskalakan agar muat dalam ukuran target
-# (px pada 96 DPI -> point), konten di tengah halaman.
+# PDF: BUKAN resize ukuran piksel halaman, melainkan kompres ukuran
+# file — tiga preset langsung: Small / Medium / Large (DPI render +
+# kualitas JPEG). Tiap halaman dirender jadi gambar JPEG, jadi teks
+# di PDF tidak bisa diseleksi lagi.
 
 import os
 import tkinter as tk
@@ -45,16 +47,46 @@ class ResizeDialog(tk.Toplevel):
             info = os.path.basename(self.files[0])
         ttk.Label(self, text=info).pack(anchor="w", padx=12, pady=(0, 6))
 
-        ref = self._reference_size()
-        self.preset = PresetFrame(self, ref_size=ref)
-        self.preset.pack(fill="x", padx=12, pady=4)
+        if kind == "pdf":
+            # Resize PDF = kompres ukuran file, langsung tiga preset.
+            # Bukan ukuran piksel halaman (cara lama hanya menampilkan
+            # ulang konten asli tanpa mengecilkan file).
+            ttk.Label(
+                self,
+                text="Pilih ukuran hasil — makin kecil makin hemat "
+                     "ruang, makin besar makin dekat aslinya.").pack(
+                         anchor="w", padx=12, pady=(0, 2))
+            ttk.Label(
+                self,
+                text="Tiap halaman jadi gambar — teks tidak bisa "
+                     "diseleksi lagi.").pack(anchor="w", padx=12)
+            self.pdf_preset = tk.StringVar(value="Medium")
+            preset_frame = ttk.LabelFrame(self, text="Ukuran hasil")
+            preset_frame.pack(fill="x", padx=12, pady=6)
+            for name, desc in (
+                    ("Small", "File paling kecil — cukup untuk dibaca "
+                              "di layar"),
+                    ("Medium", "Seimbang antara ukuran dan kualitas"),
+                    ("Large", "Kualitas paling dekat aslinya — file "
+                              "paling besar")):
+                ttk.Radiobutton(preset_frame, text=name,
+                                variable=self.pdf_preset,
+                                value=name).pack(anchor="w", padx=8,
+                                                 pady=(4, 0))
+                ttk.Label(preset_frame, text="    " + desc).pack(
+                    anchor="w", padx=8)
+            ttk.Label(preset_frame, text="").pack()
+        else:
+            ref = self._reference_size()
+            self.preset = PresetFrame(self, ref_size=ref)
+            self.preset.pack(fill="x", padx=12, pady=4)
 
-        self.smaller_only = tk.BooleanVar(value=True)
+            self.smaller_only = tk.BooleanVar(value=True)
+            ttk.Checkbutton(
+                self, text="Make pictures smaller but not larger",
+                variable=self.smaller_only).pack(anchor="w", padx=12, pady=1)
         self.overwrite = tk.BooleanVar(value=False)
         self.ignore_orientation = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            self, text="Make pictures smaller but not larger",
-            variable=self.smaller_only).pack(anchor="w", padx=12, pady=1)
         ttk.Checkbutton(
             self, text="Resize the original pictures "
                        "(don't create copies)",
@@ -128,17 +160,6 @@ class ResizeDialog(tk.Toplevel):
     # ------------------------------------------------------------- proses
 
     def _do_resize(self):
-        tw, th = self.preset.get_target()
-        if tw is None or th is None:
-            messagebox.showwarning(
-                "Ukuran tidak valid",
-                "Isi lebar dan tinggi Custom dengan angka > 0.",
-                parent=self)
-            return
-        preset = self.preset.get_preset_name()
-        mode = self.preset.get_fit_mode()
-        smaller_only = self.smaller_only.get()
-        overwrite = self.overwrite.get()
         ok, fail = 0, []
         total = len(self.files)
         for i, path in enumerate(self.files):
@@ -147,6 +168,17 @@ class ResizeDialog(tk.Toplevel):
             self.update_idletasks()
             try:
                 if self.kind == "image":
+                    tw, th = self.preset.get_target()
+                    if tw is None or th is None:
+                        messagebox.showwarning(
+                            "Ukuran tidak valid",
+                            "Isi lebar dan tinggi Custom dengan angka "
+                            "> 0.", parent=self)
+                        return
+                    preset = self.preset.get_preset_name()
+                    mode = self.preset.get_fit_mode()
+                    smaller_only = self.smaller_only.get()
+                    overwrite = self.overwrite.get()
                     if overwrite:
                         dst = path
                     else:
@@ -161,15 +193,17 @@ class ResizeDialog(tk.Toplevel):
                         out_format=self.out_format.get(),
                         ignore_orientation=self.ignore_orientation.get())
                 else:
+                    preset = self.pdf_preset.get()
+                    overwrite = self.overwrite.get()
                     dst = path if overwrite else core.output_path_for_resize(
                         path, preset, ".pdf")
                     if os.path.abspath(dst) == os.path.abspath(path):
                         # Timpa PDF asli: tulis ke temp lalu ganti.
                         tmp = dst + ".convtool-tmp"
-                        core.resize_pdf(path, tmp, tw, th)
+                        core.resize_pdf(path, tmp, preset)
                         os.replace(tmp, dst)
                     else:
-                        core.resize_pdf(path, dst, tw, th)
+                        core.resize_pdf(path, dst, preset)
                 ok += 1
             except Exception as exc:
                 fail.append("%s: %s" % (os.path.basename(path), exc))
