@@ -1,4 +1,4 @@
-# ConvTool v1.8.1
+# ConvTool v1.8.2
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,16 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Perubahan v1.8.2 (17 Nov 2026)
+
+- **Perbaikan build dari unduhan GitHub:** `build.bat` kini membuat
+  folder `assets` kosong bila belum ada sebelum memanggil PyInstaller.
+  Repo GitHub tidak membawa folder `assets` (ikon PNG biner tidak ikut
+  push), sehingga build dari hasil unduh GitHub gagal dengan
+  `ERROR: Unable to find '...\assets' when adding binary and data
+  files`. Ikon tetap opsional — tanpa file ikon, aplikasi memakai
+  gambar lensa di pill "GPS Map Camera".
 
 ## Perubahan v1.8.1 (12 Nov 2026)
 

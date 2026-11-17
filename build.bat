@@ -45,6 +45,12 @@ if errorlevel 1 (
 )
 
 echo [3/3] Build exe (onefile, windowed)...
+REM Folder assets berisi ikon pill (gps-map-camera-icon.png) -- ikon
+REM ini opsional (aplikasi memakai gambar lensa bila ikon tidak ada),
+REM tapi PyInstaller gagal bila foldernya tidak ada sama sekali.
+REM Repo GitHub tidak membawa folder ini (ikon biner tidak ikut
+REM push), jadi buat folder kosong bila belum ada.
+if not exist assets mkdir assets
 %PY% -m PyInstaller --noconfirm --onefile --windowed --name ConvTool --add-data "assets;assets" convtool.py
 if errorlevel 1 (
   echo BUILD GAGAL.
