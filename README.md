@@ -1,4 +1,4 @@
-# ConvTool v1.8.3
+# ConvTool v1.8.4
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,24 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Perubahan v1.8.4 (17 Nov 2026)
+
+- **Resize PDF: hasil tidak pernah lebih besar dari aslinya.**
+  Laporan Rif: D-Hasil scan warna 22.133 KB, hasil Small v1.8.3
+  malah 28.999 KB. Penyebab: render warna menyimpan 3 kanal noise —
+  bila scan aslinya sudah terkompresi efisien, JPEG warna di 100 DPI
+  bisa lebih besar dari aslinya. Perbaikan: **Small dan Medium kini
+  hitam-putih** (100 DPI q55 / 150 DPI q70), Large tetap berwarna
+  (200 DPI q85). Tes simulasi scan 6 halaman: asli 389 KB jadi
+  Small 53 KB, Medium 132 KB, Large 380 KB.
+- **Jaminan anti-membesar:** bila hasil render ternyata tetap lebih
+  besar dari aslinya, output diganti salinan asli yang dibersihkan
+  (garbage + deflate + clean) — tidak pernah lebih besar.
+- Dialog selesai kini menampilkan ukuran sebelum -> sesudah per file
+  (mis. "D-Hasil (Small).pdf: 21,1 MB -> 2,8 MB"), dan menulis
+  "(tidak bisa lebih kecil — sudah optimal)" bila file memang sudah
+  optimal.
 
 ## Perubahan v1.8.3 (17 Nov 2026)
 

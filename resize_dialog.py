@@ -58,17 +58,17 @@ class ResizeDialog(tk.Toplevel):
                          anchor="w", padx=12, pady=(0, 2))
             ttk.Label(
                 self,
-                text="Tiap halaman jadi gambar — teks tidak bisa "
-                     "diseleksi lagi.").pack(anchor="w", padx=12)
+                text="Small & Medium hitam-putih (paling hemat untuk "
+                     "dokumen hasil scan). Tiap halaman jadi gambar — "
+                     "teks tidak bisa diseleksi lagi.").pack(
+                         anchor="w", padx=12)
             self.pdf_preset = tk.StringVar(value="Medium")
             preset_frame = ttk.LabelFrame(self, text="Ukuran hasil")
             preset_frame.pack(fill="x", padx=12, pady=6)
             for name, desc in (
-                    ("Small", "File paling kecil — cukup untuk dibaca "
-                              "di layar"),
-                    ("Medium", "Seimbang antara ukuran dan kualitas"),
-                    ("Large", "Kualitas paling dekat aslinya — file "
-                              "paling besar")):
+                    ("Small", "Hitam-putih — file paling kecil"),
+                    ("Medium", "Hitam-putih — seimbang"),
+                    ("Large", "Berwarna — paling dekat aslinya")):
                 ttk.Radiobutton(preset_frame, text=name,
                                 variable=self.pdf_preset,
                                 value=name).pack(anchor="w", padx=8,
@@ -161,6 +161,7 @@ class ResizeDialog(tk.Toplevel):
 
     def _do_resize(self):
         ok, fail = 0, []
+        sizes_info = []  # (nama file, sebelum byte, sesudah byte) — PDF
         total = len(self.files)
         for i, path in enumerate(self.files):
             self.status.set("Memproses %d/%d: %s"
@@ -197,6 +198,7 @@ class ResizeDialog(tk.Toplevel):
                     overwrite = self.overwrite.get()
                     dst = path if overwrite else core.output_path_for_resize(
                         path, preset, ".pdf")
+                    before = os.path.getsize(path)
                     if os.path.abspath(dst) == os.path.abspath(path):
                         # Timpa PDF asli: tulis ke temp lalu ganti.
                         tmp = dst + ".convtool-tmp"
@@ -204,6 +206,8 @@ class ResizeDialog(tk.Toplevel):
                         os.replace(tmp, dst)
                     else:
                         core.resize_pdf(path, dst, preset)
+                    sizes_info.append((os.path.basename(dst), before,
+                                       os.path.getsize(dst)))
                 ok += 1
             except Exception as exc:
                 fail.append("%s: %s" % (os.path.basename(path), exc))
@@ -212,6 +216,15 @@ class ResizeDialog(tk.Toplevel):
                 "Selesai dengan %d gagal" % len(fail),
                 "Berhasil: %d file.\nGagal:\n%s"
                 % (ok, "\n".join(fail)), parent=self)
+        elif self.kind == "pdf" and sizes_info:
+            lines = []
+            for name, before, after in sizes_info:
+                line = "%s: %s -> %s" % (name, core.human_size(before),
+                                         core.human_size(after))
+                if after >= before:
+                    line += " (tidak bisa lebih kecil — sudah optimal)"
+                lines.append(line)
+            messagebox.showinfo("Selesai", "\n".join(lines), parent=self)
         else:
             messagebox.showinfo("Selesai", "Berhasil me-resize %d file."
                                 % ok, parent=self)

@@ -39,18 +39,33 @@ PRESET_ORDER = ["Small", "Medium", "Large", "Phone", "Custom"]
 JPEG_QUALITY_DEFAULT = 90
 
 # Preset Resize PDF — BUKAN ukuran piksel halaman, melainkan tingkat
-# kompresi file (DPI render x kualitas JPEG). PDF yang "di-resize"
-# adalah PDF yang ukuran filenya mengecil; halaman hasil render
-# mempertahankan aspek aslinya (lebar/tinggi mengikuti DPI).
-#   Small  — 100 DPI, JPEG q55: file paling kecil, cukup untuk layar
-#   Medium — 150 DPI, JPEG q70: seimbang antara ukuran dan kualitas
-#   Large  — 200 DPI, JPEG q85: kualitas paling dekat aslinya
+# kompresi file (DPI render x kualitas JPEG x warna). PDF yang
+# "di-resize" adalah PDF yang ukuran filenya mengecil; halaman hasil
+# render mempertahankan aspek aslinya (lebar/tinggi mengikuti DPI).
+#   Small  — 100 DPI, JPEG q55, hitam-putih: file paling kecil
+#   Medium — 150 DPI, JPEG q70, hitam-putih: seimbang
+#   Large  — 200 DPI, JPEG q85, berwarna: paling dekat aslinya
+# Small/Medium hitam-putih dengan sengaja: dokumen hasil scan
+# (formulir, D-Hasil) isinya teks — JPEG warna menyimpan 3 kanal
+# noise, dan render warna di 100 DPI bisa LEBIH BESAR dari aslinya
+# bila scan aslinya sudah terkompresi efisien (kasus nyata 17 Nov:
+# D-Hasil 22.133 KB jadi 28.999 KB di Small warna). Hitam-putih
+# memangkas ~2/3 ukuran JPEG pada DPI/kualitas yang sama.
 PDF_RESIZE_PRESETS = {
-    "Small":  (100, 55),
-    "Medium": (150, 70),
-    "Large":  (200, 85),
+    "Small":  (100, 55, "gray"),
+    "Medium": (150, 70, "gray"),
+    "Large":  (200, 85, "color"),
 }
 PDF_RESIZE_ORDER = ["Small", "Medium", "Large"]
+
+
+def human_size(n):
+    """Ukuran byte jadi '537 KB' / '22,1 MB' (koma desimal)."""
+    if n < 1024:
+        return "%d B" % n
+    if n < 1024 * 1024:
+        return "%s KB" % ("%.0f" % (n / 1024.0)).replace(".", ",")
+    return "%s MB" % ("%.1f" % (n / 1048576.0)).replace(".", ",")
 
 # ---------------------------------------------------------------- util
 
@@ -968,25 +983,33 @@ def pdf_to_images(pdf_path, out_dir, base_name, longest_px, fmt="PNG"):
 
 def resize_pdf(pdf_path, output_path, preset="Medium"):
     """Buat PDF baru yang ukuran filenya lebih kecil: tiap halaman
-    di-render jadi gambar JPEG pada DPI + kualitas preset, lalu
-    disusun kembali jadi PDF dengan aspek halaman dipertahankan.
+    di-render jadi gambar JPEG pada DPI + kualitas + warna preset,
+    lalu disusun kembali jadi PDF dengan aspek halaman dipertahankan.
 
-    preset: "Small" (100 DPI, JPEG q55 — file paling kecil),
-    "Medium" (150 DPI, JPEG q70), atau "Large" (200 DPI, JPEG q85 —
-    kualitas paling dekat aslinya). Ukuran hasil selalu berurutan:
-    Small < Medium < Large.
+    preset: "Small" (100 DPI, JPEG q55, hitam-putih — file paling
+    kecil), "Medium" (150 DPI, JPEG q70, hitam-putih), atau "Large"
+    (200 DPI, JPEG q85, berwarna — kualitas paling dekat aslinya).
+    Ukuran hasil selalu berurutan: Small < Medium < Large.
+
+    JAMINAN: hasil tidak pernah lebih besar dari aslinya. Bila render
+    ternyata lebih besar (mis. scan asli sudah terkompresi sangat
+    efisien), output diganti salinan asli yang dibersihkan
+    (garbage + deflate + clean) — paling tidak sama besar dengan
+    aslinya, tidak pernah lebih besar.
 
     Catatan: halaman hasil adalah gambar — teks di PDF tidak bisa
     diseleksi lagi. Mengembalikan jumlah halaman."""
     if preset not in PDF_RESIZE_PRESETS:
         raise ValueError("preset Resize PDF tidak dikenal: %r "
                          "(pilih: Small, Medium, Large)" % preset)
-    dpi, quality = PDF_RESIZE_PRESETS[preset]
+    dpi, quality, mode = PDF_RESIZE_PRESETS[preset]
     zoom = dpi / 72.0
+    colorspace = (pymupdf.csGRAY if mode == "gray" else pymupdf.csRGB)
     src = pymupdf.open(pdf_path)
     dst = pymupdf.open()
     for page in src:
-        pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom))
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom),
+                              colorspace=colorspace)
         data = pix.tobytes("jpeg", jpg_quality=quality)
         # Ukuran halaman dari pixmap (sudah memperhitungkan rotasi).
         w_pt = pix.width * 72.0 / dpi
@@ -998,6 +1021,12 @@ def resize_pdf(pdf_path, output_path, preset="Medium"):
     count = len(dst)
     src.close()
     dst.close()
+    # Jaminan: jangan pernah mengembalikan file lebih besar dari asli.
+    orig_size = os.path.getsize(pdf_path)
+    if os.path.getsize(output_path) >= orig_size:
+        cleaned = pymupdf.open(pdf_path)
+        cleaned.save(output_path, garbage=4, deflate=True, clean=True)
+        cleaned.close()
     return count
 
 

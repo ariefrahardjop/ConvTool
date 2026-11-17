@@ -16,7 +16,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
 import core  # noqa: E402
 import watermark  # noqa: E402
@@ -132,46 +132,54 @@ def test_pdf_roundtrip():
           and all(p.endswith(".jpg") for p in made_jpg), "")
 
 
+def _make_scan_pdf(path, pages=6):
+    """PDF simulasi dokumen hasil scan: A4 warna 200 DPI, JPEG q75,
+    grain kertas di seluruh halaman + blok teks + stempel biru.
+    Mengembalikan ukuran file."""
+    import pymupdf
+    from PIL import ImageChops
+    base = Image.new("RGB", (1654, 2339), (255, 255, 255))
+    d = ImageDraw.Draw(base)
+    for i in range(60):
+        y = 80 + i * 36
+        d.rectangle([90, y, 90 + 300 + (i * 37) % 1100, y + 14],
+                    fill=(30, 30, 30))
+    d.ellipse([1200, 1900, 1420, 2120], outline=(30, 80, 180), width=6)
+    d.rectangle([1150, 1950, 1470, 2070], outline=(30, 80, 180), width=4)
+    # Grain kertas: noise Gaussian cepat (C), dicampur tipis ke putih.
+    noise = Image.effect_noise((1654, 2339), 28).convert("RGB")
+    im = ImageChops.blend(base, noise, 0.12)
+    jpg = os.path.join(WORK, "scan.jpg")
+    im.save(jpg, "JPEG", quality=75)
+    doc = pymupdf.open()
+    for _ in range(pages):
+        page = doc.new_page(width=595, height=842)
+        page.insert_image(page.rect, filename=jpg)
+    doc.save(path)
+    doc.close()
+    return os.path.getsize(path)
+
+
 def test_resize_pdf():
     print("\n== resize_pdf ==")
-    import random
     import pymupdf
-    # PDF 2 halaman dari foto berisik (mirip foto asli): file aslinya
-    # besar, jadi kompresi harus terlihat jelas di ukuran byte.
-    random.seed(7)
-    im = Image.new("RGB", (2400, 1800))
-    px = im.load()
-    for y in range(0, 1800, 4):
-        for x in range(0, 2400, 4):
-            c = (random.randint(0, 255), random.randint(0, 255),
-                 random.randint(0, 255))
-            for dy in range(4):
-                for dx in range(4):
-                    px[x + dx, y + dy] = c
-    jpg = os.path.join(WORK, "foto.jpg")
-    im.save(jpg, "JPEG", quality=92)
-    src = os.path.join(WORK, "besar.pdf")
-    doc = pymupdf.open()
-    for _ in range(2):
-        page = doc.new_page(width=842, height=595)
-        page.insert_image(page.rect, filename=jpg)
-    doc.save(src)
-    doc.close()
-    orig_size = os.path.getsize(src)
+    # Kasus nyata Rif 17 Nov: D-Hasil scan warna 22.133 KB, hasil
+    # Small WARNA v1.8.3 malah 28.999 KB. Simulasi scan di sini harus
+    # mengecil di SEMUA preset — Small/Medium kini hitam-putih.
+    src = os.path.join(WORK, "dhasil.pdf")
+    orig_size = _make_scan_pdf(src, pages=6)
     sizes = {}
     for preset in core.PDF_RESIZE_ORDER:
         dst = core.output_path_for_resize(src, preset, ".pdf")
         n = core.resize_pdf(src, dst, preset)
-        check("resize_pdf %s 2 halaman" % preset, n == 2, "")
+        check("resize_pdf %s 6 halaman" % preset, n == 6, "")
         d2 = pymupdf.open(dst)
         n_pages = len(d2)
         d2.close()
-        check("resize_pdf %s halaman utuh" % preset, n_pages == 2, "")
+        check("resize_pdf %s halaman utuh" % preset, n_pages == 6, "")
         check("resize_pdf nama file %s" % preset,
-              os.path.basename(dst) == "besar (%s).pdf" % preset, dst)
+              os.path.basename(dst) == "dhasil (%s).pdf" % preset, dst)
         sizes[preset] = os.path.getsize(dst)
-    # Inti laporan user: ukuran hasil HARUS mengecil (cara lama
-    # show_pdf_page menyalin gambar asli utuh -> ukuran tetap sama).
     check("resize_pdf Small < asli", sizes["Small"] < orig_size,
           "%d < %d" % (sizes["Small"], orig_size))
     check("resize_pdf Small < Medium < Large",
@@ -179,11 +187,30 @@ def test_resize_pdf():
           str(sizes))
     check("resize_pdf Large < asli", sizes["Large"] < orig_size,
           "%d < %d" % (sizes["Large"], orig_size))
+    # Jaminan: hasil TIDAK PERNAH lebih besar dari aslinya — PDF teks
+    # murni (vektor, sudah sangat kecil) adalah kasus terburuk render:
+    # render Large pasti lebih besar, jadi fallback harus jalan.
+    txt = os.path.join(WORK, "teks.pdf")
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((100, 100), "Halo ConvTool", fontsize=40)
+    doc.save(txt)
+    doc.close()
+    txt_size = os.path.getsize(txt)
+    dst = core.output_path_for_resize(txt, "Large", ".pdf")
+    core.resize_pdf(txt, dst, "Large")
+    check("resize_pdf jaminan tidak lebih besar dari asli",
+          os.path.getsize(dst) <= txt_size,
+          "%d <= %d" % (os.path.getsize(dst), txt_size))
     try:
         core.resize_pdf(src, os.path.join(WORK, "x.pdf"), "Raksasa")
         check("resize_pdf preset salah ditolak", False, "tidak raise")
     except ValueError:
         check("resize_pdf preset salah ditolak", True, "")
+    check("human_size KB", core.human_size(537422) == "525 KB",
+          core.human_size(537422))
+    check("human_size MB", core.human_size(22133000) == "21,1 MB",
+          core.human_size(22133000))
 
 
 def test_exif_roundtrip():
