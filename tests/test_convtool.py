@@ -133,22 +133,24 @@ def test_pdf_roundtrip():
 
 
 def _make_scan_pdf(path, pages=6):
-    """PDF simulasi dokumen hasil scan: A4 warna 200 DPI, JPEG q75,
-    grain kertas di seluruh halaman + blok teks + stempel biru.
-    Mengembalikan ukuran file."""
+    """PDF simulasi dokumen hasil scan (D-Hasil): A4 warna 200 DPI,
+    JPEG q75, tabel rapat penuh angka + kop + stempel biru + grain
+    scanner di seluruh halaman. Mengembalikan ukuran file."""
     import pymupdf
     from PIL import ImageChops
     base = Image.new("RGB", (1654, 2339), (255, 255, 255))
     d = ImageDraw.Draw(base)
-    for i in range(60):
-        y = 80 + i * 36
-        d.rectangle([90, y, 90 + 300 + (i * 37) % 1100, y + 14],
-                    fill=(30, 30, 30))
-    d.ellipse([1200, 1900, 1420, 2120], outline=(30, 80, 180), width=6)
-    d.rectangle([1150, 1950, 1470, 2070], outline=(30, 80, 180), width=4)
-    # Grain kertas: noise Gaussian cepat (C), dicampur tipis ke putih.
-    noise = Image.effect_noise((1654, 2339), 28).convert("RGB")
-    im = ImageChops.blend(base, noise, 0.12)
+    d.rectangle([80, 60, 1574, 130], fill=(20, 20, 20))
+    for r in range(42):
+        y = 160 + r * 50
+        d.rectangle([80, y, 1574, y + 2], fill=(60, 60, 60))
+        for c in range(8):
+            x = 90 + c * 185
+            d.rectangle([x, y + 8, x + 150, y + 40], fill=(25, 25, 25))
+    d.ellipse([1200, 2050, 1420, 2270], outline=(30, 80, 180), width=6)
+    # Grain kertas: noise Gaussian cepat (C), dicampur ke putih.
+    noise = Image.effect_noise((1654, 2339), 32).convert("RGB")
+    im = ImageChops.blend(base, noise, 0.4)
     jpg = os.path.join(WORK, "scan.jpg")
     im.save(jpg, "JPEG", quality=75)
     doc = pymupdf.open()
@@ -182,11 +184,21 @@ def test_resize_pdf():
         sizes[preset] = os.path.getsize(dst)
     check("resize_pdf Small < asli", sizes["Small"] < orig_size,
           "%d < %d" % (sizes["Small"], orig_size))
+    # Small 1-bit harus JAUH lebih kecil (dokumen teks/scan): ambang
+    # 10% dari aslinya — simulasi memberi ~1%.
+    check("resize_pdf Small < 10% asli",
+          sizes["Small"] < orig_size * 0.1,
+          "%d < %d" % (sizes["Small"], orig_size * 0.1))
     check("resize_pdf Small < Medium < Large",
           sizes["Small"] < sizes["Medium"] < sizes["Large"],
           str(sizes))
-    check("resize_pdf Large < asli", sizes["Large"] < orig_size,
-          "%d < %d" % (sizes["Large"], orig_size))
+    check("resize_pdf Medium < asli", sizes["Medium"] < orig_size,
+          "%d < %d" % (sizes["Medium"], orig_size))
+    # Large (warna 200 DPI) pada simulasi ini LEBIH BESAR dari asli —
+    # jaminan anti-membesar harus menggantinya dengan salinan asli
+    # yang dibersihkan, jadi Large <= asli (bukan <).
+    check("resize_pdf Large <= asli (jaminan)", sizes["Large"] <= orig_size,
+          "%d <= %d" % (sizes["Large"], orig_size))
     # Jaminan: hasil TIDAK PERNAH lebih besar dari aslinya — PDF teks
     # murni (vektor, sudah sangat kecil) adalah kasus terburuk render:
     # render Large pasti lebih besar, jadi fallback harus jalan.

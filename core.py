@@ -39,24 +39,29 @@ PRESET_ORDER = ["Small", "Medium", "Large", "Phone", "Custom"]
 JPEG_QUALITY_DEFAULT = 90
 
 # Preset Resize PDF — BUKAN ukuran piksel halaman, melainkan tingkat
-# kompresi file (DPI render x kualitas JPEG x warna). PDF yang
-# "di-resize" adalah PDF yang ukuran filenya mengecil; halaman hasil
-# render mempertahankan aspek aslinya (lebar/tinggi mengikuti DPI).
-#   Small  — 100 DPI, JPEG q55, hitam-putih: file paling kecil
-#   Medium — 150 DPI, JPEG q70, hitam-putih: seimbang
-#   Large  — 200 DPI, JPEG q85, berwarna: paling dekat aslinya
-# Small/Medium hitam-putih dengan sengaja: dokumen hasil scan
-# (formulir, D-Hasil) isinya teks — JPEG warna menyimpan 3 kanal
-# noise, dan render warna di 100 DPI bisa LEBIH BESAR dari aslinya
-# bila scan aslinya sudah terkompresi efisien (kasus nyata 17 Nov:
-# D-Hasil 22.133 KB jadi 28.999 KB di Small warna). Hitam-putih
-# memangkas ~2/3 ukuran JPEG pada DPI/kualitas yang sama.
+# kompresi file. PDF yang "di-resize" adalah PDF yang ukuran filenya
+# mengecil; halaman hasil render mempertahankan aspek aslinya.
+#   Small  — 1-bit (hitam-putih pekat) 150 DPI: file paling kecil.
+#            Teks dokumen scan dirender lalu diubah jadi hitam-putih
+#            pekat (ambang 160) — JPEG noise yang membengkakkan scan
+#            asli hilang total. Untuk dokumen teks/scan, Small bisa
+#            100x lebih kecil dari aslinya (simulasi D-Hasil: asli
+#            103 KB/hal -> 0,8 KB/hal). Foto/stempel jadi hitam-putih.
+#   Medium — grayscale 100 DPI, JPEG q55: seimbang.
+#   Large  — warna 200 DPI, JPEG q85: paling dekat aslinya.
+# Small/Medium hitam-putih dengan sengaja: dokumen hasil scan isinya
+# teks — JPEG warna menyimpan 3 kanal noise, dan render warna bisa
+# LEBIH BESAR dari aslinya bila scan aslinya sudah terkompresi
+# efisien (kasus nyata 17 Nov: D-Hasil 22.133 KB, Small warna
+# v1.8.3 malah 28.999 KB; Small gray v1.8.4 pun hanya turun
+# beberapa KB — scan aslinya sudah setara gray 100 DPI q55).
 PDF_RESIZE_PRESETS = {
-    "Small":  (100, 55, "gray"),
-    "Medium": (150, 70, "gray"),
+    "Small":  (150, None, "bitonal"),
+    "Medium": (100, 55, "gray"),
     "Large":  (200, 85, "color"),
 }
 PDF_RESIZE_ORDER = ["Small", "Medium", "Large"]
+BITONAL_THRESHOLD = 160  # ambang hitam-putih Small (0-255)
 
 
 def human_size(n):
@@ -983,13 +988,14 @@ def pdf_to_images(pdf_path, out_dir, base_name, longest_px, fmt="PNG"):
 
 def resize_pdf(pdf_path, output_path, preset="Medium"):
     """Buat PDF baru yang ukuran filenya lebih kecil: tiap halaman
-    di-render jadi gambar JPEG pada DPI + kualitas + warna preset,
-    lalu disusun kembali jadi PDF dengan aspek halaman dipertahankan.
+    di-render lalu disusun kembali jadi PDF dengan aspek halaman
+    dipertahankan.
 
-    preset: "Small" (100 DPI, JPEG q55, hitam-putih — file paling
-    kecil), "Medium" (150 DPI, JPEG q70, hitam-putih), atau "Large"
-    (200 DPI, JPEG q85, berwarna — kualitas paling dekat aslinya).
-    Ukuran hasil selalu berurutan: Small < Medium < Large.
+    preset: "Small" (1-bit hitam-putih pekat 150 DPI — file paling
+    kecil, untuk dokumen teks/scan), "Medium" (grayscale 100 DPI,
+    JPEG q55), atau "Large" (warna 200 DPI, JPEG q85 — kualitas
+    paling dekat aslinya). Ukuran hasil selalu berurutan:
+    Small < Medium < Large.
 
     JAMINAN: hasil tidak pernah lebih besar dari aslinya. Bila render
     ternyata lebih besar (mis. scan asli sudah terkompresi sangat
@@ -998,19 +1004,33 @@ def resize_pdf(pdf_path, output_path, preset="Medium"):
     aslinya, tidak pernah lebih besar.
 
     Catatan: halaman hasil adalah gambar — teks di PDF tidak bisa
-    diseleksi lagi. Mengembalikan jumlah halaman."""
+    diseleksi lagi; Small mengubah foto/stempel jadi hitam-putih.
+    Mengembalikan jumlah halaman."""
     if preset not in PDF_RESIZE_PRESETS:
         raise ValueError("preset Resize PDF tidak dikenal: %r "
                          "(pilih: Small, Medium, Large)" % preset)
     dpi, quality, mode = PDF_RESIZE_PRESETS[preset]
     zoom = dpi / 72.0
-    colorspace = (pymupdf.csGRAY if mode == "gray" else pymupdf.csRGB)
     src = pymupdf.open(pdf_path)
     dst = pymupdf.open()
     for page in src:
-        pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom),
-                              colorspace=colorspace)
-        data = pix.tobytes("jpeg", jpg_quality=quality)
+        if mode == "bitonal":
+            # Render grayscale, lalu ubah jadi 1-bit (hitam-putih
+            # pekat): noise JPEG hilang, teks jadi garis tegas.
+            pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom),
+                                  colorspace=pymupdf.csGRAY)
+            pil = Image.open(io.BytesIO(pix.tobytes("png")))
+            pil = pil.convert("L").point(
+                lambda v: 0 if v < BITONAL_THRESHOLD else 255, mode="1")
+            buf = io.BytesIO()
+            pil.save(buf, "PNG")
+            data = buf.getvalue()
+        else:
+            colorspace = (pymupdf.csGRAY if mode == "gray"
+                          else pymupdf.csRGB)
+            pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom),
+                                  colorspace=colorspace)
+            data = pix.tobytes("jpeg", jpg_quality=quality)
         # Ukuran halaman dari pixmap (sudah memperhitungkan rotasi).
         w_pt = pix.width * 72.0 / dpi
         h_pt = pix.height * 72.0 / dpi

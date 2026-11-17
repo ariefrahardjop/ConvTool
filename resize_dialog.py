@@ -58,15 +58,17 @@ class ResizeDialog(tk.Toplevel):
                          anchor="w", padx=12, pady=(0, 2))
             ttk.Label(
                 self,
-                text="Small & Medium hitam-putih (paling hemat untuk "
-                     "dokumen hasil scan). Tiap halaman jadi gambar — "
+                text="Small mengubah halaman jadi hitam-putih pekat — "
+                     "cocok untuk dokumen teks/scan; foto & stempel "
+                     "jadi hitam-putih. Tiap halaman jadi gambar — "
                      "teks tidak bisa diseleksi lagi.").pack(
                          anchor="w", padx=12)
             self.pdf_preset = tk.StringVar(value="Medium")
             preset_frame = ttk.LabelFrame(self, text="Ukuran hasil")
             preset_frame.pack(fill="x", padx=12, pady=6)
             for name, desc in (
-                    ("Small", "Hitam-putih — file paling kecil"),
+                    ("Small", "Hitam-putih pekat (teks) — file paling "
+                              "kecil"),
                     ("Medium", "Hitam-putih — seimbang"),
                     ("Large", "Berwarna — paling dekat aslinya")):
                 ttk.Radiobutton(preset_frame, text=name,
