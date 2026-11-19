@@ -48,10 +48,13 @@ def main():
     env["PYTHONPATH"] = root_dir + os.pathsep + env.get("PYTHONPATH", "")
 
     print("\n== e2e single-instance: 2 proses, 1 dialog ==")
+    state_file = os.path.join(WORK, "state.txt")
+    env_a = dict(env)
+    env_a["CONVTOOL_STATE_FILE"] = state_file
     proc_a = subprocess.Popen(
         [sys.executable, os.path.join(root_dir, "convtool.py"),
          "exif", photos[0]],
-        cwd=root_dir, env=env)
+        cwd=root_dir, env=env_a)
     time.sleep(2.0)  # beri waktu A bind port + buka dialog
     check("proses A masih hidup (primary, dialog terbuka)",
           proc_a.poll() is None, "")
@@ -68,6 +71,22 @@ def main():
     time.sleep(0.5)
     check("proses A TETAP hidup sesudah B keluar (tetap primary)",
           proc_a.poll() is None, "")
+    # Bukti paling penting: daftar file di dialog A BERTAMBAH jadi 3
+    # (kiriman B digabung oleh _poll_ipc -> add_files).
+    got = []
+    end = time.time() + 3.0
+    while time.time() < end:
+        try:
+            got = [l for l in open(state_file,
+                                   encoding="utf-8").read().splitlines()
+                   if l.strip()]
+        except Exception:
+            got = []
+        if len(got) == 3:
+            break
+        time.sleep(0.2)
+    check("dialog A berisi 3 foto sesudah kiriman B",
+          got == photos, str(got))
     proc_a.terminate()
     try:
         proc_a.wait(timeout=5)

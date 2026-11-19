@@ -1,4 +1,4 @@
-# ConvTool v1.9.2
+# ConvTool v1.9.3
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,29 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Perubahan v1.9.3 (19 Nov 2026)
+
+- **Perbaikan single-instance yang beneran di Windows.** v1.9.2
+  TETAP membuka banyak jendela di PC Rif (screenshot 19 Nov 08:48)
+  karena bug saya: `SO_REUSEADDR`. Di Linux nilai itu TIDAK
+  mengizinkan dua socket bind port yang sama (makanya semua uji di
+  sini lolos), TAPI DI WINDOWS MENGIZINKAN — jadi ketiga proses
+  berhasil bind 127.0.0.1:49190 dan ketiganya mengira dirinya primary.
+  v1.9.3: `SO_REUSEADDR` DIHAPUS, dan election di Windows kini memakai
+  **named mutex** (`CreateMutexW`, nama `ConvToolSingleInstance_v1`)
+  — mekanisme standar Windows untuk single-instance. Socket localhost
+  hanya dipakai untuk meneruskan daftar file, bukan untuk election.
+  Kiriman ke primary dicoba ulang 4x (tiap percobaan maks 0,5 detik)
+  untuk menutup jeda antara primary merebut mutex dan listener-nya
+  siap; bila bind listener gagal sesudah menang mutex, mutex dilepas
+  lagi supaya proses berikutnya tidak terkunci.
+- Kait diagnostik `CONVTOOL_STATE_FILE`: bila env var ini diset,
+  `_poll_ipc` menulis daftar file dialog aktif ke berkas itu tiap
+  tick — dipakai uji E2E untuk membuktikan kiriman benar-benar
+  masuk ke dialog primary.
+- Uji E2E kini membuktikan penggabungannya, bukan cuma proses B
+  keluar cepat: dialog proses A berisi 3 foto sesudah kiriman B.
 
 ## Perubahan v1.9.2 (19 Nov 2026)
 

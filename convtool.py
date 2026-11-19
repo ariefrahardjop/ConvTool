@@ -104,6 +104,17 @@ def _poll_ipc(root):
             except Exception:
                 pass
         _PENDING.extend(pending)
+        # Kait diagnostik: bila CONVTOOL_STATE_FILE diset (dipakai uji
+        # E2E dan diagnosis di PC), tulis daftar file dialog aktif ke
+        # berkas itu tiap tick — membuktikan primary menerima kiriman.
+        state_file = os.environ.get("CONVTOOL_STATE_FILE")
+        if state_file:
+            try:
+                with open(state_file, "w",
+                          encoding="utf-8") as fh:
+                    fh.write("\n".join(dlg.files))
+            except Exception:
+                pass
     else:
         _merged, pending = single_instance.merge_pending(
             _IPC_INBOX, None, [])

@@ -108,8 +108,7 @@ def main():
     import subprocess
     squat_code = (
         "import socket, time; "
-        "s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, "
-        "socket.SO_REUSEADDR, 1); "
+        "s = socket.socket(); "
         "s.bind(('127.0.0.1', 49191)); s.listen(1); time.sleep(6)")
     proc = subprocess.Popen([sys.executable, "-c", squat_code])
     try:
@@ -132,6 +131,43 @@ def main():
             proc.wait(timeout=3)
         except Exception:
             proc.kill()
+
+    print("\n== mutex Windows: bukan Windows -> None ==")
+    check("_win_acquire_mutex di Linux kembalikan None",
+          single_instance._win_acquire_mutex() is None, "")
+    check("_win_release_mutex di Linux aman dipanggil",
+          single_instance._win_release_mutex() is None, "")
+
+    print("\n== _send_to_primary: retry lalu menyerah ==")
+    # Primary palsu: listen tapi tidak pernah kirim ACK -> claim
+    # harus retry lalu standalone, bukan menggantung selamanya.
+    import subprocess as _sp
+    silent_code = (
+        "import socket, time; "
+        "s = socket.socket(); "
+        "s.bind(('127.0.0.1', 49192)); s.listen(4); "
+        "c, _ = s.accept(); time.sleep(5)")
+    proc2 = _sp.Popen([sys.executable, "-c", silent_code])
+    try:
+        time.sleep(0.5)
+        old_port = single_instance.PORT
+        single_instance.PORT = 49192
+        try:
+            t0 = time.time()
+            ok = single_instance._send_to_primary("exif", [files[0]])
+            dt = time.time() - t0
+        finally:
+            single_instance.PORT = old_port
+        check("listener diam -> _send_to_primary False", ok is False,
+              str(ok))
+        check("retry selesai dalam batas wajar (< 5 detik)",
+              dt < 5.0, "%.1f detik" % dt)
+    finally:
+        proc2.terminate()
+        try:
+            proc2.wait(timeout=3)
+        except Exception:
+            proc2.kill()
 
     print("\n==================================")
     print("LOLOS: %d   GAGAL: %d" % (PASSES[0], len(FAILURES)))
