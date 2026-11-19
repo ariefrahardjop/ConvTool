@@ -34,6 +34,11 @@ Phone / Custom, seperti dialog "Image Resizer for Windows").
   (+ tulis catatan di `CHANGELOG.md`), push ke `main` — workflow
   otomatis build exe + buat GitHub Release `vX.Y.Z`. Bila rilis
   untuk versi itu sudah ada, workflow berhenti tanpa membuat ganda.
+  Pengecualian rilis pertama (v1.9.6): file workflow
+  (`.github/workflows/build.yml`) tidak bisa dibuat lewat API
+  GitHub, jadi ditambahkan lewat web UI — sesudah itu jalankan
+  sekali manual dari tab Actions (Run workflow), selanjutnya
+  otomatis.
 - Catatan: v1.9.6 adalah instalasi manual terakhir — sesudah
   terpasang, versi berikutnya datang lewat notif di atas.
 
