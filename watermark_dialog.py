@@ -1,5 +1,10 @@
 # watermark_dialog.py — Dialog Watermark Klasik / Job Timestamp.
 #
+# SATU frame untuk banyak foto: daftar foto di kiri; klik foto untuk
+# melihat pratinjaunya. "Terapkan Watermark" menerapkan ke SEMUA foto
+# (GPS & tanggal diambil dari EXIF tiap foto bila ada; isian form
+# dipakai sebagai cadangan bila foto tidak ber-GPS).
+#
 # Data per file: GPS + tanggal/jam diambil dari EXIF foto bila ada;
 # bila GPS tidak ada, pakai lat/lon manual dari dialog ini.
 # Alamat diisi otomatis lewat reverse-geocode Nominatim (bisa diedit).
@@ -7,6 +12,9 @@
 # Pratinjau LANGSUNG di samping form (kolom kanan), diperbarui otomatis
 # tiap isian berubah (debounce 600 md, render di thread latar).
 # Terapkan menulis file BARU (_klasik / _job) untuk semua file.
+#
+# Responsif: isi dialog di dalam ScrollableFrame (ui_common) sehingga
+# di layar kecil isi bisa di-scroll dan tombol bawah selalu terlihat.
 
 import os
 import queue
@@ -20,6 +28,7 @@ from PIL import Image, ImageOps, ImageTk
 import core
 import watermark
 from pickers import DatePickerEntry, TimePickerEntry
+from ui_common import ScrollableFrame
 
 
 class WatermarkDialog(tk.Toplevel):
@@ -27,9 +36,10 @@ class WatermarkDialog(tk.Toplevel):
         super().__init__(parent)
         self.files = list(files)
         self.style = style
+        self._current_file = self.files[0] if self.files else None
         self.title("Watermark %s" % ("Klasik" if style == "klasik"
                                      else "Job Timestamp"))
-        self.resizable(False, False)
+        self.resizable(True, True)
         # transient HANYA bila induk terlihat (lihat resize_dialog).
         if parent is not None and parent.winfo_viewable():
             self.transient(parent)
@@ -40,8 +50,13 @@ class WatermarkDialog(tk.Toplevel):
         dt = core.parse_exif_datetime(first.get("datetime")) \
             or datetime.now()
 
+        # ---- isi (bisa di-scroll di layar kecil) + tombol tetap di bawah
+        body = ScrollableFrame(self)
+        body.pack(fill="both", expand=True)
+        self._body = body
+
         # ---- dua kolom: form (kiri) + pratinjau langsung (kanan)
-        main = ttk.Frame(self)
+        main = ttk.Frame(body.inner)
         main.pack(fill="both", expand=True)
         left = ttk.Frame(main)
         left.pack(side="left", anchor="n", fill="y", padx=(12, 0),
@@ -49,12 +64,13 @@ class WatermarkDialog(tk.Toplevel):
         right = ttk.Frame(main)
         right.pack(side="left", anchor="n", fill="both", expand=True,
                    padx=(12, 12), pady=(10, 12))
-        pv = ttk.LabelFrame(right, text="Pratinjau langsung")
-        pv.pack(fill="both", expand=True)
+        self.pv = ttk.LabelFrame(right, text="Pratinjau langsung")
+        self.pv.pack(fill="both", expand=True)
         # width (satuan karakter) memberi kolom pratinjau lebar awal
         # yang cukup (~420 px) — tanpa ini kolom hanya selebar teks
         # "Me-render pratinjau..." dan gambar landscape terpotong.
-        self.preview_label = ttk.Label(pv, text="Me-render pratinjau...",
+        self.preview_label = ttk.Label(self.pv,
+                                       text="Me-render pratinjau...",
                                        wraplength=420, width=60,
                                        anchor="center")
         self.preview_label.pack(padx=8, pady=8)
@@ -78,6 +94,19 @@ class WatermarkDialog(tk.Toplevel):
                              "ada, dipakai isian di bawah ini."
                   % len(self.files), wraplength=500).pack(
                       anchor="w", pady=(0, 6))
+
+        # Daftar foto: klik untuk melihat pratinjaunya di kanan.
+        if len(self.files) > 1:
+            ttk.Label(left, text="Foto:",
+                      font=("", 10, "bold")).pack(anchor="w", pady=(6, 0))
+            self.file_list = tk.Listbox(
+                left, height=min(len(self.files), 5),
+                exportselection=False)
+            for f in self.files:
+                self.file_list.insert("end", os.path.basename(f))
+            self.file_list.pack(fill="x", pady=2)
+            self.file_list.bind("<<ListboxSelect>>", self._on_select_file)
+            self.file_list.selection_set(0)
 
         form = ttk.Frame(left)
         form.pack(fill="x", pady=4)
@@ -158,8 +187,9 @@ class WatermarkDialog(tk.Toplevel):
         ttk.Label(left, textvariable=self.status_var, wraplength=500,
                   foreground="#333333").pack(fill="x", pady=4)
 
-        btns = ttk.Frame(left)
-        btns.pack(fill="x", pady=(6, 0))
+        # ---- tombol: selalu terlihat (di luar area scroll)
+        btns = ttk.Frame(self)
+        btns.pack(fill="x", padx=12, pady=(6, 12))
         ttk.Button(btns, text="Terapkan Watermark",
                    command=self._apply, default="active").pack(
                        side="right", padx=4)
@@ -182,9 +212,35 @@ class WatermarkDialog(tk.Toplevel):
 
         if first.get("lat") is not None:
             self._load_address()
+        self._update_preview_title()
         self._schedule_preview(300)
+        # Batas tinggi isi 82% layar (sisanya tombol + tepi); lebar
+        # dan tinggi jendela juga dibatasi agar muat di layar kecil.
+        body.fit_to_window()
 
     # ------------------------------------------------------------- data
+
+    def _on_select_file(self, _event=None):
+        """Klik foto di daftar -> pratinjau beralih ke foto itu
+        (isian form tetap sebagai cadangan untuk foto tanpa GPS)."""
+        if not hasattr(self, "file_list"):
+            return
+        sel = self.file_list.curselection()
+        if not sel:
+            return
+        self._current_file = self.files[sel[0]]
+        self._update_preview_title()
+        self._schedule_preview(100)
+
+    def _update_preview_title(self):
+        if not self.files:
+            return
+        idx = self.files.index(self._current_file) \
+            if self._current_file in self.files else 0
+        self.pv.configure(
+            text="Pratinjau langsung — foto %d dari %d: %s"
+                 % (idx + 1, len(self.files),
+                    os.path.basename(self._current_file)))
 
     def _parse_latlon(self):
         try:
@@ -304,13 +360,14 @@ class WatermarkDialog(tk.Toplevel):
             self._preview_job = None
 
     def _render_preview(self):
-        """Render file pertama dengan isian saat ini (thread latar);
-        hasil lama yang telat datang diabaikan (generation counter)."""
+        """Render foto yang sedang dipilih dengan isian saat ini
+        (thread latar); hasil lama yang telat datang diabaikan
+        (generation counter)."""
         self._preview_job = None
-        if not self.files:
+        if not self.files or self._current_file is None:
             return
         try:
-            data = self._per_file_data(self.files[0])
+            data = self._per_file_data(self._current_file)
         except Exception:
             return
         (lat, lon, _dt, _addr, _place, _wt, _tc, _cond,
@@ -326,7 +383,7 @@ class WatermarkDialog(tk.Toplevel):
         gen = self._preview_gen
         self.preview_label.configure(text="Me-render pratinjau...")
         threading.Thread(target=self._render_preview_bg,
-                         args=(gen, self.files[0], data),
+                         args=(gen, self._current_file, data),
                          daemon=True).start()
 
     def _render_preview_bg(self, gen, path, data):
@@ -362,7 +419,9 @@ class WatermarkDialog(tk.Toplevel):
         if avail_w < 100:  # belum ter-layout, pakai lebar rencana
             avail_w = 440
         avail_w = max(200, avail_w - 16)
-        tw, th = core.fit_within(out.width, out.height, avail_w, 480)
+        # Tinggi pratinjau juga dibatasi layar kecil (55% tinggi layar).
+        max_h = min(480, int(self.winfo_screenheight() * 0.55))
+        tw, th = core.fit_within(out.width, out.height, avail_w, max_h)
         disp = out.resize((tw, th), Image.LANCZOS)
         self._preview_photo = ImageTk.PhotoImage(disp)
         self.preview_label.configure(image=self._preview_photo, text="")

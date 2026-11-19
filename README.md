@@ -1,4 +1,4 @@
-# ConvTool v1.8.5
+# ConvTool v1.9.0
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,35 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Perubahan v1.9.0 (19 Nov 2026)
+
+- **Banyak file, satu frame.** Dulu Edit EXIF membuka satu dialog
+  PER foto (pilih 5 foto = 5 jendela berurutan). Kini satu dialog
+  untuk semua foto: daftar foto di atas, klik untuk mengedit foto
+  itu; edit tiap foto disimpan sementara saat pindah foto, jadi
+  tidak hilang. Tombol "Simpan" menyimpan foto yang dibuka,
+  "Simpan Semua" menyimpan semua foto yang sudah diedit.
+  Watermark juga kini punya daftar foto di kiri — klik foto untuk
+  melihat pratinjaunya (judul pratinjau: "foto 2 dari 5"); Terapkan
+  tetap menerapkan ke semua foto. Resize / Images to PDF / PDF to
+  Images memang sudah satu dialog untuk banyak file.
+- **Dialog responsif di layar kecil.** Dulu semua dialog berukuran
+  tetap (`resizable(False, False)`): di layar kecil (mis. 1024x600)
+  isinya melebihi layar dan tombol bawah tertutup. Kini isi dialog
+  ada di dalam ScrollableFrame (ui_common): isi bisa di-scroll
+  dengan mouse wheel, tombol bawah selalu terlihat, dan tinggi
+  jendela dibatasi 92% layar (`ScrollableFrame.fit_to_window` —
+  tinggi canvas = sisa layar setelah tombol/judul/daftar).
+  Berlaku untuk semua dialog: Resize (gambar & PDF), Images to PDF,
+  PDF to Images, EXIF Editor, Watermark.
+- **Uji GUI headless baru** (`tests/test_gui_smoke.py`, jalan di
+  bawah Xvfb layar 1024x600): memastikan semua dialog muat di layar
+  dan setiap tombol terlihat penuh, plus perilaku multi-foto EXIF &
+  Watermark. Uji ini sempat menangkap bug nyata: tombol Simpan EXIF
+  di y=574 dari jendela 564 (terpotong) — diperbaiki dengan
+  perhitungan tinggi dari `winfo_reqheight` jendela (padding pack
+  ikut terhitung).
 
 ## Perubahan v1.8.5 (17 Nov 2026)
 

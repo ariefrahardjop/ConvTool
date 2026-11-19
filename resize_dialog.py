@@ -10,13 +10,17 @@
 # file — tiga preset langsung: Small / Medium / Large (DPI render +
 # kualitas JPEG). Tiap halaman dirender jadi gambar JPEG, jadi teks
 # di PDF tidak bisa diseleksi lagi.
+#
+# Responsif: isi dialog di dalam ScrollableFrame (ui_common) sehingga
+# di layar kecil isi bisa di-scroll dan tombol Resize/Cancel di bawah
+# selalu terlihat.
 
 import os
 import tkinter as tk
 from tkinter import messagebox, ttk
 
 import core
-from ui_common import PresetFrame, make_status
+from ui_common import PresetFrame, ScrollableFrame, make_status
 
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tif",
               ".tiff")
@@ -30,7 +34,7 @@ class ResizeDialog(tk.Toplevel):
         self.kind = kind
         self.title("Resize your pictures" if kind == "image"
                    else "Resize PDF")
-        self.resizable(False, False)
+        self.resizable(True, True)
         # transient HANYA bila induk terlihat. Di jalur klik kanan,
         # induknya root yang disembunyikan (withdraw) — transient ke
         # jendela tersembunyi membuat dialog tidak tampil di Windows.
@@ -47,24 +51,30 @@ class ResizeDialog(tk.Toplevel):
             info = os.path.basename(self.files[0])
         ttk.Label(self, text=info).pack(anchor="w", padx=12, pady=(0, 6))
 
+        # ---- isi (bisa di-scroll di layar kecil) + tombol tetap di bawah
+        body = ScrollableFrame(self)
+        body.pack(fill="both", expand=True)
+        self._body = body
+        content = body.inner
+
         if kind == "pdf":
             # Resize PDF = kompres ukuran file, langsung tiga preset.
             # Bukan ukuran piksel halaman (cara lama hanya menampilkan
             # ulang konten asli tanpa mengecilkan file).
             ttk.Label(
-                self,
+                content,
                 text="Pilih ukuran hasil — makin kecil makin hemat "
                      "ruang, makin besar makin dekat aslinya.").pack(
                          anchor="w", padx=12, pady=(0, 2))
             ttk.Label(
-                self,
+                content,
                 text="Small mengubah halaman jadi hitam-putih pekat — "
                      "cocok untuk dokumen teks/scan; foto & stempel "
                      "jadi hitam-putih. Tiap halaman jadi gambar — "
                      "teks tidak bisa diseleksi lagi.").pack(
                          anchor="w", padx=12)
             self.pdf_preset = tk.StringVar(value="Medium")
-            preset_frame = ttk.LabelFrame(self, text="Ukuran hasil")
+            preset_frame = ttk.LabelFrame(content, text="Ukuran hasil")
             preset_frame.pack(fill="x", padx=12, pady=6)
             for name, desc in (
                     ("Small", "Hitam-putih pekat (teks) — file paling "
@@ -80,27 +90,27 @@ class ResizeDialog(tk.Toplevel):
             ttk.Label(preset_frame, text="").pack()
         else:
             ref = self._reference_size()
-            self.preset = PresetFrame(self, ref_size=ref)
+            self.preset = PresetFrame(content, ref_size=ref)
             self.preset.pack(fill="x", padx=12, pady=4)
 
             self.smaller_only = tk.BooleanVar(value=True)
             ttk.Checkbutton(
-                self, text="Make pictures smaller but not larger",
+                content, text="Make pictures smaller but not larger",
                 variable=self.smaller_only).pack(anchor="w", padx=12, pady=1)
         self.overwrite = tk.BooleanVar(value=False)
         self.ignore_orientation = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            self, text="Resize the original pictures "
+            content, text="Resize the original pictures "
                        "(don't create copies)",
             variable=self.overwrite).pack(anchor="w", padx=12, pady=1)
         if kind == "image":
             ttk.Checkbutton(
-                self, text="Ignore the orientation of pictures",
+                content, text="Ignore the orientation of pictures",
                 variable=self.ignore_orientation).pack(
                     anchor="w", padx=12, pady=1)
 
         # Advanced options (khusus gambar): kualitas JPEG + format output.
-        self.adv_frame = ttk.LabelFrame(self, text="Advanced options")
+        self.adv_frame = ttk.LabelFrame(content, text="Advanced options")
         self.quality = tk.IntVar(value=core.JPEG_QUALITY_DEFAULT)
         self.out_format = tk.StringVar(value="same")
         if kind == "image":
@@ -119,12 +129,13 @@ class ResizeDialog(tk.Toplevel):
                       text="same = ikut format asli").grid(
                           row=1, column=2, sticky="w", padx=4)
             self.adv_visible = False
-            ttk.Button(self, text="Advanced options...",
+            ttk.Button(content, text="Advanced options...",
                        command=self._toggle_adv).pack(
                            anchor="w", padx=12, pady=(6, 0))
 
-        self.status = make_status(self)
+        self.status = make_status(content)
 
+        # ---- tombol: selalu terlihat (di luar area scroll)
         btns = ttk.Frame(self)
         btns.pack(fill="x", padx=12, pady=(6, 12))
         ttk.Button(btns, text="Resize", command=self._do_resize,
@@ -132,6 +143,9 @@ class ResizeDialog(tk.Toplevel):
         ttk.Button(btns, text="Cancel", command=self.destroy).pack(
             side="right", padx=4)
         self.bind("<Escape>", lambda e: self.destroy())
+        # Batas tinggi isi 82% layar (sisanya tombol + tepi); lebar
+        # dan tinggi jendela juga dibatasi agar muat di layar kecil.
+        body.fit_to_window()
 
     # ------------------------------------------------------------- helpers
 

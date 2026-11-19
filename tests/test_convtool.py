@@ -487,6 +487,21 @@ def test_fit_within():
           core.fit_within(1000, 1000, 418, 480) == (418, 418), "")
 
 
+def test_fit_to_screen():
+    print("\n== fit_to_screen (logika, tanpa GUI) ==")
+    from ui_common import fit_size_for_screen
+    # Layar kecil 1024x600: dialog 2000x1500 dipangkas ke 96%/94%.
+    check("fit layar kecil memangkas",
+          fit_size_for_screen(2000, 1500, 1024, 600) == (983, 564),
+          str(fit_size_for_screen(2000, 1500, 1024, 600)))
+    # Dialog kecil tidak diubah.
+    check("fit dialog kecil tetap",
+          fit_size_for_screen(400, 300, 1024, 600) == (400, 300), "")
+    # Tidak pernah lebih kecil dari 200x200.
+    check("fit batas minimum 200",
+          fit_size_for_screen(50, 50, 1024, 600) == (200, 200), "")
+
+
 def test_preview_downscale():
     print("\n== preview_downscale ==")
     # Pratinjau dirender dari salinan kecil (maks 1200 px), bukan
@@ -521,6 +536,7 @@ def main():
     test_exif_extra_tags()
     test_images_to_pdf_options()
     test_fit_within()
+    test_fit_to_screen()
     test_preview_downscale()
     print("\n==================================")
     print("LOLOS: %d   GAGAL: %d" % (PASSES[0], len(FAILURES)))

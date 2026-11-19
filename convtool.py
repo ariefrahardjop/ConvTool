@@ -20,6 +20,7 @@ import exif_editor
 import pdf_tools
 import resize_dialog
 import watermark_dialog
+from ui_common import fit_to_screen
 
 VERBS = {
     "resize-image", "resize-pdf", "images-to-pdf", "pdf-to-images",
@@ -49,8 +50,8 @@ def _run_verb(root, verb, files):
     elif verb == "pdf-to-images":
         pdf_tools.run_pdf_to_images(root, files)
     elif verb == "exif":
-        for f in files:
-            exif_editor.run_exif_editor(root, f)
+        # SATU dialog untuk semua foto (dulu: satu dialog per foto).
+        exif_editor.run_exif_editor(root, files)
     elif verb == "watermark-klasik":
         watermark_dialog.run_watermark_dialog(root, files, "klasik")
     elif verb == "watermark-job":
@@ -98,6 +99,7 @@ class Launcher(tk.Tk):
                       foreground="#555555").pack(anchor="w", padx=18)
         ttk.Button(self, text="Tutup", command=self.destroy).pack(
             pady=(10, 12))
+        fit_to_screen(self)
 
     def _open_tool(self, key):
         if key == "image":

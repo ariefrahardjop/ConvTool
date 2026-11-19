@@ -12,6 +12,105 @@ from tkinter import ttk
 import core
 
 
+def fit_size_for_screen(req_w, req_h, scr_w, scr_h, max_w_frac=0.96,
+                        max_h_frac=0.94):
+    """(lebar, tinggi) jendela yang muat di layar — tidak pernah
+    melebihi pecahan layar yang diberikan."""
+    return (max(200, min(req_w, int(scr_w * max_w_frac))),
+            max(200, min(req_h, int(scr_h * max_h_frac))))
+
+
+def fit_to_screen(window, max_w_frac=0.96, max_h_frac=0.94):
+    """Batasi ukuran jendela dialog agar muat di layar (dipanggil
+    setelah semua widget terpasang). Tanpa ini, dialog yang isinya
+    tinggi (watermark, EXIF editor) bisa melebihi layar kecil dan
+    tombol bawahnya tertutup / tidak bisa diklik."""
+    window.update_idletasks()
+    w, h = fit_size_for_screen(
+        window.winfo_reqwidth(), window.winfo_reqheight(),
+        window.winfo_screenwidth(), window.winfo_screenheight(),
+        max_w_frac, max_h_frac)
+    window.geometry("%dx%d" % (w, h))
+
+
+class ScrollableFrame(ttk.Frame):
+    """Wadah isi dialog yang bisa di-scroll vertikal bila konten lebih
+    tinggi dari ruang yang tersedia.
+
+    Pola pakai: isi dialog dipack ke ``body.inner``; baris tombol
+    dipack ke dialognya langsung (DI LUAR body) sehingga tombol
+    selalu terlihat — isi yang di-scroll, tombol tidak ikut bergeser.
+    Di layar besar, body menampilkan seluruh isi tanpa scrollbar
+    yang mengganggu (scrollbar tetap ada tapi tidak aktif).
+
+    Scroll mouse wheel hanya aktif saat kursor di atas frame ini,
+    supaya tidak merebut scroll dialog lain."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.canvas = tk.Canvas(self, highlightthickness=0)
+        self.vbar = ttk.Scrollbar(self, orient="vertical",
+                                  command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.vbar.set)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.vbar.pack(side="right", fill="y")
+        self.inner = ttk.Frame(self.canvas)
+        self._win = self.canvas.create_window((0, 0), window=self.inner,
+                                              anchor="nw")
+        self.inner.bind("<Configure>", self._on_inner_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        self.canvas.bind(
+            "<Enter>",
+            lambda _e: self.canvas.bind_all(
+                "<MouseWheel>", self._on_mousewheel))
+        self.canvas.bind(
+            "<Leave>",
+            lambda _e: self.canvas.unbind_all("<MouseWheel>"))
+
+    def _on_inner_configure(self, _event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        # Lebar isi mengikuti lebar canvas (tidak ada scroll horizontal).
+        self.canvas.itemconfigure(self._win, width=event.width)
+
+    def _on_mousewheel(self, event):
+        # Windows: delta kelipatan 120 (negatif = ke bawah).
+        try:
+            steps = -int(event.delta / 120)
+        except Exception:
+            steps = 0
+        if steps:
+            self.canvas.yview_scroll(steps, "units")
+
+    def fit_height(self, max_h):
+        """Batasi tinggi canvas: setinggi isi bila isi pendek, atau
+        max_h bila isi panjang (sisanya di-scroll). Dipanggil setelah
+        isi terpasang."""
+        self.update_idletasks()
+        need = self.inner.winfo_reqheight()
+        self.canvas.configure(height=max(100, min(need, max_h)))
+
+    def fit_to_window(self, max_frac=0.92):
+        """Batasi tinggi canvas supaya SELURUH jendela (isi + tombol +
+        judul) muat di layar: canvas mendapat sisa ruang setelah
+        semua isi tetap di luarnya. Dipanggil di akhir __init__
+        dialog, setelah semua widget terpasang. Tanpa ini, canvas
+        yang dipatok 82% layar ditambah tombol/daftar di luarnya
+        bisa melebihi layar dan tombol bawah tertutup (kasus EXIF
+        Editor di layar 1024x600: tombol di y=574 dari jendela 564).
+
+        Tinggi isi tetap dihitung dari tinggi total yang diminta
+        jendela dikurangi tinggi body ini — jadi padding pack ikut
+        terhitung, bukan hanya tinggi widgetnya."""
+        top = self.winfo_toplevel()
+        top.update_idletasks()
+        scr_h = top.winfo_screenheight()
+        other = top.winfo_reqheight() - self.winfo_reqheight()
+        self.fit_height(int(scr_h * max_frac) - other)
+        fit_to_screen(top, max_h_frac=max_frac)
+
+
 class PresetFrame(ttk.LabelFrame):
     """Frame 'Select a size.' — mengembalikan (lebar, tinggi) piksel
     atau None bila Custom belum valid. Untuk Percent, lebar/tinggi

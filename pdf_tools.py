@@ -15,7 +15,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import core
-from ui_common import PresetFrame, make_status
+from ui_common import PresetFrame, ScrollableFrame, make_status
 
 IMAGE_FILETYPES = [("Images", "*.jpg *.jpeg *.png *.webp *.bmp *.gif"),
                    ("All files", "*.*")]
@@ -25,7 +25,7 @@ class ImagesToPdfDialog(tk.Toplevel):
     def __init__(self, parent, files):
         super().__init__(parent)
         self.title("Convert Images to PDF")
-        self.resizable(False, False)
+        self.resizable(True, True)
         # transient HANYA bila induk terlihat (lihat resize_dialog).
         if parent is not None and parent.winfo_viewable():
             self.transient(parent)
@@ -37,7 +37,13 @@ class ImagesToPdfDialog(tk.Toplevel):
         ttk.Label(self, text="Tiap gambar menjadi satu halaman.").pack(
             anchor="w", padx=12)
 
-        list_frame = ttk.Frame(self)
+        # ---- isi (bisa di-scroll di layar kecil) + tombol tetap di bawah
+        body = ScrollableFrame(self)
+        body.pack(fill="both", expand=True)
+        self._body = body
+        content = body.inner
+
+        list_frame = ttk.Frame(content)
         list_frame.pack(fill="both", padx=12, pady=6)
         self.listbox = tk.Listbox(list_frame, width=64, height=8)
         self.listbox.pack(side="left", fill="both", expand=True)
@@ -53,7 +59,7 @@ class ImagesToPdfDialog(tk.Toplevel):
                    command=lambda: self._move(1)).pack(fill="x", pady=2)
         self._refresh_list()
 
-        opt = ttk.LabelFrame(self, text="Pengaturan halaman")
+        opt = ttk.LabelFrame(content, text="Pengaturan halaman")
         opt.pack(fill="x", padx=12, pady=4)
         ttk.Label(opt, text="Orientasi:").grid(
             row=0, column=0, sticky="w", padx=4, pady=2)
@@ -93,7 +99,8 @@ class ImagesToPdfDialog(tk.Toplevel):
         ttk.Label(opt, text="(Small = PDF lebih kecil)").grid(
             row=4, column=2, sticky="w", pady=2)
 
-        self.status = make_status(self)
+        self.status = make_status(content)
+        # ---- tombol: selalu terlihat (di luar area scroll)
         btns = ttk.Frame(self)
         btns.pack(fill="x", padx=12, pady=(6, 12))
         ttk.Button(btns, text="Convert to PDF",
@@ -102,6 +109,7 @@ class ImagesToPdfDialog(tk.Toplevel):
         ttk.Button(btns, text="Cancel", command=self.destroy).pack(
             side="right", padx=4)
         self.bind("<Escape>", lambda e: self.destroy())
+        body.fit_to_window()
 
     def _refresh_list(self):
         self.listbox.delete(0, "end")
@@ -176,7 +184,7 @@ class PdfToImagesDialog(tk.Toplevel):
         super().__init__(parent)
         self.files = list(files)
         self.title("Convert PDF to Images")
-        self.resizable(False, False)
+        self.resizable(True, True)
         # transient HANYA bila induk terlihat (lihat resize_dialog).
         if parent is not None and parent.winfo_viewable():
             self.transient(parent)
@@ -191,10 +199,16 @@ class PdfToImagesDialog(tk.Toplevel):
         ttk.Label(self, text="Ukuran = sisi terpanjang tiap halaman "
                              "(piksel).").pack(anchor="w", padx=12)
 
-        self.preset = PresetFrame(self)
+        # ---- isi (bisa di-scroll di layar kecil) + tombol tetap di bawah
+        body = ScrollableFrame(self)
+        body.pack(fill="both", expand=True)
+        self._body = body
+        content = body.inner
+
+        self.preset = PresetFrame(content)
         self.preset.pack(fill="x", padx=12, pady=4)
 
-        fmt_frame = ttk.Frame(self)
+        fmt_frame = ttk.Frame(content)
         fmt_frame.pack(fill="x", padx=12, pady=4)
         ttk.Label(fmt_frame, text="Format hasil:").pack(side="left")
         self.out_format = tk.StringVar(value="PNG")
@@ -202,7 +216,8 @@ class PdfToImagesDialog(tk.Toplevel):
                      state="readonly", values=["PNG", "JPG"]).pack(
                          side="left", padx=6)
 
-        self.status = make_status(self)
+        self.status = make_status(content)
+        # ---- tombol: selalu terlihat (di luar area scroll)
         btns = ttk.Frame(self)
         btns.pack(fill="x", padx=12, pady=(6, 12))
         ttk.Button(btns, text="Convert", command=self._do_convert,
@@ -210,6 +225,7 @@ class PdfToImagesDialog(tk.Toplevel):
         ttk.Button(btns, text="Cancel", command=self.destroy).pack(
             side="right", padx=4)
         self.bind("<Escape>", lambda e: self.destroy())
+        body.fit_to_window()
 
     def _do_convert(self):
         tw, th = self.preset.get_target()
