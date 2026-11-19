@@ -97,10 +97,13 @@ class WatermarkDialog(tk.Toplevel):
         ttk.Label(left, textvariable=self.count_var,
                   wraplength=500).pack(anchor="w", pady=(0, 6))
 
-        # Daftar foto: klik untuk melihat pratinjaunya di kanan.
-        self.file_list = None
-        if len(self.files) > 1:
-            self._create_file_list(left)
+        # Daftar foto: SELALU di atas form (di bawah label jumlah),
+        # supaya posisinya tetap walau foto lain masuk belakangan lewat
+        # single-instance. Dulu daftar dibuat hanya bila >1 foto, dan
+        # bila dibuat belakangan dari add_files ia ter-pack PALING
+        # BAWAH kolom kiri, di bawah form — masalah yang sama seperti
+        # di EXIF Editor (screenshot Rif 19 Nov 09:01).
+        self._create_file_list(left)
 
         form = ttk.Frame(left)
         form.pack(fill="x", pady=4)
@@ -215,16 +218,26 @@ class WatermarkDialog(tk.Toplevel):
     # ------------------------------------------------------------- data
 
     def _create_file_list(self, left):
-        """Buat daftar foto di kiri (dipanggil saat init bila >1 foto,
-        atau dari add_files saat foto kedua masuk)."""
-        ttk.Label(left, text="Foto:",
-                  font=("", 10, "bold")).pack(anchor="w", pady=(6, 0))
+        """Buat daftar foto di kiri, di bawah label jumlah, di atas
+        form. Dipanggil sekali saat init — selalu, bahkan untuk 1
+        foto — supaya posisinya tidak pernah pindah saat foto lain
+        masuk. Klik baris = ganti pratinjau."""
+        list_frame = ttk.Frame(left)
+        list_frame.pack(fill="x", pady=(6, 0))
+        self._list_frame = list_frame
+        ttk.Label(list_frame, text="Foto:",
+                  font=("", 10, "bold")).pack(side="left", anchor="n")
         self.file_list = tk.Listbox(
-            left, height=min(len(self.files), 5),
+            list_frame, height=min(max(len(self.files), 1), 5),
             exportselection=False)
         for f in self.files:
             self.file_list.insert("end", os.path.basename(f))
-        self.file_list.pack(fill="x", pady=2)
+        self.file_list.pack(side="left", fill="x", expand=True,
+                            padx=(6, 0))
+        scroll = ttk.Scrollbar(list_frame, orient="vertical",
+                               command=self.file_list.yview)
+        self.file_list.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="left", fill="y")
         self.file_list.bind("<<ListboxSelect>>", self._on_select_file)
         idx = self.files.index(self._current_file) \
             if self._current_file in self.files else 0
@@ -232,21 +245,18 @@ class WatermarkDialog(tk.Toplevel):
 
     def add_files(self, paths):
         """Tambah foto ke dialog yang sedang terbuka (single-instance:
-        proses lain meneruskan file-nya ke sini). Pratinjau yang
-        sedang tampil tidak berubah; daftar hanya bertambah."""
+        proses lain meneruskan file-nya ke sini). Daftar sudah ada di
+        atas sejak init — di sini hanya menambah baris. Pratinjau yang
+        sedang tampil tidak berubah."""
         new = [os.path.abspath(p) for p in paths
                if os.path.isfile(p) and os.path.abspath(p) not in
                [os.path.abspath(f) for f in self.files]]
         if not new:
             return
         self.files.extend(new)
-        if self.file_list is None:
-            # Daftar dibuat di frame kiri, di bawah label jumlah.
-            self._create_file_list(self._left_frame)
-        else:
-            for f in new:
-                self.file_list.insert("end", os.path.basename(f))
-            self.file_list.configure(height=min(len(self.files), 5))
+        for f in new:
+            self.file_list.insert("end", os.path.basename(f))
+        self.file_list.configure(height=min(len(self.files), 5))
         self.count_var.set(
             "%d foto dipilih. GPS & tanggal diambil "
             "dari EXIF tiap foto bila ada; bila tidak "

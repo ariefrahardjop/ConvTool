@@ -198,10 +198,19 @@ def main():
     dlg.deiconify()
     dlg.update_idletasks()
     dlg.update()
-    check("exif 1 foto awal tanpa daftar", dlg.file_list is None, "")
+    # Daftar SELALU ada di atas sejak init (bahkan untuk 1 foto),
+    # dan ter-pack SEBELUM isi + tombol: pack_slaves()[0] = frame daftar.
+    check("exif 1 foto awal daftar sudah ada di atas",
+          dlg.file_list is not None and dlg.file_list.size() == 1
+          and dlg.pack_slaves()[0] is dlg._list_frame, "")
+    check("exif tombol tetap paling bawah",
+          dlg.pack_slaves()[-1].winfo_children()[0].cget("text")
+          == "Simpan", "")
     dlg.add_files(photos[1:])
     check("exif add_files membuat daftar 3 foto",
           dlg.file_list is not None and dlg.file_list.size() == 3, "")
+    check("exif add_files daftar TETAP di atas",
+          dlg.pack_slaves()[0] is dlg._list_frame, "")
     check("exif add_files judul jadi Foto 1 dari 3",
           "Foto 1 dari 3" in dlg.title(), dlg.title())
     dlg.add_files(photos[1:])  # kiriman duplikat diabaikan
@@ -213,8 +222,10 @@ def main():
     dlg.deiconify()
     dlg.update_idletasks()
     dlg.update()
-    check("watermark 1 foto awal tanpa daftar",
-          dlg.file_list is None, "")
+    check("watermark 1 foto awal daftar sudah ada di atas form",
+          dlg.file_list is not None and dlg.file_list.size() == 1
+          and dlg._left_frame.pack_slaves().index(dlg._list_frame) == 2,
+          "")
     dlg.add_files(photos[1:])
     check("watermark add_files membuat daftar 3 foto",
           dlg.file_list is not None and dlg.file_list.size() == 3, "")

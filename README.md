@@ -1,4 +1,4 @@
-# ConvTool v1.9.3
+# ConvTool v1.9.4
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,21 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Perubahan v1.9.4 (19 Nov 2026)
+
+- **Daftar foto pindah ke ATAS (EXIF Editor + Watermark).** Penyebab
+  daftar di bawah: daftar dulu dibuat hanya bila >1 foto, dan bila
+  dibuat belakangan dari `add_files` (foto kiriman single-instance)
+  ia ter-pack PALING BAWAH, di bawah tombol — persis screenshot Rif
+  19 Nov 09:01. Kini daftar dibuat SELALU sejak init, di atas dialog
+  (EXIF: di luar area scroll, di atas pratinjau + form, tombol tetap
+  paling bawah; Watermark: di bawah label jumlah, di atas form).
+  Daftar juga punya scrollbar vertikal (foto >5 bisa di-scroll).
+  `add_files` kini hanya menambah baris, posisi tidak pernah pindah.
+- Uji GUI bertambah: daftar sudah ada sejak 1 foto, ter-pack pertama
+  (EXIF) / di atas form (Watermark), dan tetap di atas sesudah
+  `add_files`.
 
 ## Perubahan v1.9.3 (19 Nov 2026)
 

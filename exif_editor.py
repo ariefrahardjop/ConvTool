@@ -69,10 +69,12 @@ class ExifEditorDialog(tk.Toplevel):
         self.map_lat = None
         self.map_lon = None
 
-        # ---- daftar foto (bila lebih dari satu)
-        self.file_list = None
-        if len(self.files) > 1:
-            self._create_file_list()
+        # ---- daftar foto: SELALU di atas (di luar area scroll), supaya
+        # posisinya tetap walau foto lain masuk belakangan lewat
+        # single-instance. Dulu daftar dibuat hanya bila >1 foto, dan
+        # bila dibuat belakangan dari add_files ia ter-pack PALING
+        # BAWAH, di bawah tombol (screenshot Rif 19 Nov 09:01).
+        self._create_file_list()
 
         # ---- isi (bisa di-scroll di layar kecil) + tombol tetap di bawah
         body = ScrollableFrame(self)
@@ -206,38 +208,42 @@ class ExifEditorDialog(tk.Toplevel):
     # ------------------------------------------------- ganti foto & pending
 
     def _create_file_list(self):
-        """Buat daftar foto di atas dialog (dipanggil saat init bila
-        >1 foto, atau dari add_files saat foto kedua masuk)."""
+        """Buat daftar foto di ATAS dialog (di luar area scroll).
+        Dipanggil sekali saat init — selalu, bahkan untuk 1 foto —
+        supaya posisinya tidak pernah pindah saat foto lain masuk."""
         list_frame = ttk.Frame(self)
         list_frame.pack(fill="x", padx=12, pady=(10, 0))
+        self._list_frame = list_frame
         ttk.Label(list_frame, text="Foto:",
                   font=("", 10, "bold")).pack(side="left", anchor="n")
         self.file_list = tk.Listbox(
-            list_frame, height=min(len(self.files), 5),
+            list_frame, height=min(max(len(self.files), 1), 5),
             exportselection=False)
         for f in self.files:
             self.file_list.insert("end", os.path.basename(f))
         self.file_list.pack(side="left", fill="x", expand=True,
                             padx=(6, 0))
+        scroll = ttk.Scrollbar(list_frame, orient="vertical",
+                               command=self.file_list.yview)
+        self.file_list.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="left", fill="y")
         self.file_list.bind("<<ListboxSelect>>", self._on_select_file)
         self.file_list.selection_set(self._current)
 
     def add_files(self, paths):
         """Tambah foto ke dialog yang sedang terbuka (single-instance:
-        proses lain meneruskan file-nya ke sini). Edit foto yang
-        sedang dibuka tidak terganggu; daftar hanya bertambah."""
+        proses lain meneruskan file-nya ke sini). Daftar sudah ada di
+        atas sejak init — di sini hanya menambah baris. Edit foto yang
+        sedang dibuka tidak terganggu."""
         new = [os.path.abspath(p) for p in paths
                if os.path.isfile(p) and os.path.abspath(p) not in
                [os.path.abspath(f) for f in self.files]]
         if not new:
             return
         self.files.extend(new)
-        if self.file_list is None:
-            self._create_file_list()
-        else:
-            for f in new:
-                self.file_list.insert("end", os.path.basename(f))
-            self.file_list.configure(height=min(len(self.files), 5))
+        for f in new:
+            self.file_list.insert("end", os.path.basename(f))
+        self.file_list.configure(height=min(len(self.files), 5))
         self.title("Edit EXIF — Foto %d dari %d"
                    % (self._current + 1, len(self.files)))
         try:
