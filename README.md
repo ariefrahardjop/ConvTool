@@ -1,4 +1,4 @@
-# ConvTool v1.9.5
+# ConvTool v1.9.6
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,46 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Update otomatis (baru di v1.9.6)
+
+- **Exe jadi dari GitHub, tanpa Python.** Tiap versi baru di-build
+  otomatis di GitHub (GitHub Actions, `.github/workflows/build.yml`)
+  dan dilampirkan di halaman **Releases** sebagai `ConvTool.exe`
+  + paket zip `ConvTool-vX.Y.Z.zip` (exe + install.bat +
+  uninstall.bat + README + CHANGELOG). Pengguna cukup unduh zip,
+  ekstrak, lalu `install.bat` sebagai Administrator — tidak perlu
+  install Python sama sekali. `install.bat` kini menerima
+  `ConvTool.exe` di sampingnya (paket zip) atau di `dist/`
+  (hasil `build.bat` lokal).
+- **Notif pembaruan.** Tiap kali ConvTool dibuka, aplikasi mengecek
+  rilis terbaru di GitHub (repo publik, tanpa login) di thread latar,
+  maksimal sekali sehari. Offline = diam saja, tool tetap jalan.
+  Ada versi baru -> dialog "Versi baru tersedia" (sekali per versi)
+  berisi catatan perubahan. Pilih **Perbarui**: exe baru diunduh,
+  aplikasi menutup, updater PowerShell mengganti exe lama (minta
+  izin UAC bila perlu, mis. terpasang di `C:\Tools`), lalu aplikasi
+  dibuka lagi. Pilih **Nanti**: tidak ditanya lagi untuk versi itu.
+- **Periksa manual.** Launcher punya tombol "Periksa Pembaruan" +
+  label versi. Launcher kini grid 2 kolom supaya muat di layar kecil
+  (1024x600) — daftar 1 kolom + tombol bawah dulu terpotong.
+- **Cara rilis baru.** Naikkan `APP_VERSION` di `update_check.py`
+  (+ tulis catatan di `CHANGELOG.md`), push ke `main` — workflow
+  otomatis build exe + buat GitHub Release `vX.Y.Z`. Bila rilis
+  untuk versi itu sudah ada, workflow berhenti tanpa membuat ganda.
+- Catatan: v1.9.6 adalah instalasi manual terakhir — sesudah
+  terpasang, versi berikutnya datang lewat notif di atas.
+
+## Perubahan v1.9.6 (19 Nov 2026)
+
+- Notif + self-update exe dari GitHub Releases (lihat atas).
+- Launcher grid 2 kolom + tombol "Periksa Pembaruan" + label versi.
+- `install.bat` menerima exe di sampingnya atau di `dist/`.
+- Uji baru: `tests/test_update_check.py` (20 uji: banding versi,
+  parsing rilis, sekali-sehari, sekali-per-versi, unduh + cek ukuran,
+  isi skrip updater, cek latar) + uji GUI (dialog update sekali per
+  sesi, Nanti menandai versi, Perbarui memanggil pemasang; launcher
+  muat di 1024x600).
 
 ## Perubahan v1.9.5 (19 Nov 2026)
 

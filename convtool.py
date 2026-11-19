@@ -29,6 +29,7 @@ import exif_editor
 import pdf_tools
 import resize_dialog
 import single_instance
+import update_check
 import watermark_dialog
 from ui_common import fit_to_screen
 
@@ -122,6 +123,13 @@ def _poll_ipc(root):
         if _PENDING:
             verb, files = _PENDING.pop(0)
             _run_verb(root, verb, files)
+    # Notif pembaruan (bila cek latar menemukan versi baru):
+    # ditampilkan sekali per sesi; gagal di sini tidak boleh
+    # mengganggu poll IPC di atas.
+    try:
+        update_check.poll_and_show(root)
+    except Exception:
+        pass
 
 
 def _pick_files(filetypes, title):
@@ -157,15 +165,33 @@ class Launcher(tk.Tk):
                   foreground="#1a5fb4").pack(anchor="w", padx=14, pady=(12, 0))
         ttk.Label(self, text="Pilih alat, lalu pilih file.").pack(
             anchor="w", padx=14, pady=(0, 8))
-        for (label, desc, key) in self.TOOLS:
-            btn = ttk.Button(self, text=label,
+        # Grid 2 kolom (bukan daftar 1 kolom): di layar kecil
+        # (1024x600) daftar 1 kolom + tombol bawah terpotong —
+        # jendela tidak muat (uji GUI v1.9.6 menangkapnya).
+        grid = ttk.Frame(self)
+        grid.pack(padx=14, pady=(0, 6))
+        for i, (label, desc, key) in enumerate(self.TOOLS):
+            cell = ttk.Frame(grid)
+            cell.grid(row=i // 2, column=i % 2, sticky="nsew",
+                      padx=(0, 12) if i % 2 == 0 else (0, 0),
+                      pady=(0, 8))
+            btn = ttk.Button(cell, text=label,
                              command=lambda k=key: self._open_tool(k))
-            btn.pack(fill="x", padx=14, pady=2)
-            ttk.Label(self, text=desc, wraplength=420,
-                      foreground="#555555").pack(anchor="w", padx=18)
-        ttk.Button(self, text="Tutup", command=self.destroy).pack(
-            pady=(10, 12))
+            btn.pack(fill="x")
+            ttk.Label(cell, text=desc, wraplength=210,
+                      foreground="#555555").pack(anchor="w", pady=(2, 0))
+        bottom = ttk.Frame(self)
+        bottom.pack(fill="x", padx=14, pady=(4, 12))
+        ttk.Button(bottom, text="Tutup",
+                   command=self.destroy).pack(side="left")
+        ttk.Button(bottom, text="Periksa Pembaruan",
+                   command=self._check_update).pack(side="left", padx=8)
+        ttk.Label(bottom, text="Versi %s" % update_check.APP_VERSION,
+                  foreground="#555555").pack(side="right")
         fit_to_screen(self)
+
+    def _check_update(self):
+        update_check.manual_check(self)
 
     def _open_tool(self, key):
         if key == "image":
@@ -209,6 +235,7 @@ def main(argv):
         if role == "primary":
             _IPC_INBOX = inbox
             app.after(200, lambda: _poll_ipc(app))
+        update_check.start_background_check()
         app.mainloop()
         return 0
     verb = args[0].lower()
@@ -242,6 +269,7 @@ def main(argv):
         return 0
     _IPC_INBOX = inbox
     root.after(200, lambda: _poll_ipc(root))
+    update_check.start_background_check()
     # Gabungkan kiriman yang sudah tiba selama startup (proses lain
     # biasanya sudah mulai lebih dulu) sebelum dialog dibuka.
     files, pending = single_instance.merge_pending(inbox, verb, files)

@@ -21,16 +21,23 @@ if errorlevel 1 (
 
 set INSTALLDIR=C:\Tools\ConvTool
 
-if not exist "%~dp0dist\ConvTool.exe" (
-  echo dist\ConvTool.exe tidak ditemukan.
-  echo Jalankan build.bat dulu sampai selesai, baru install.bat.
+REM Exe dicari di dua tempat: di samping install.bat (paket zip
+REM dari GitHub Releases) atau di dist\ (hasil build.bat lokal).
+set EXE=
+if exist "%~dp0ConvTool.exe" set EXE=%~dp0ConvTool.exe
+if "%EXE%"=="" if exist "%~dp0dist\ConvTool.exe" set EXE=%~dp0dist\ConvTool.exe
+if "%EXE%"=="" (
+  echo ConvTool.exe tidak ditemukan.
+  echo Bila dari source: jalankan build.bat dulu sampai selesai.
+  echo Bila dari zip rilis: pastikan ConvTool.exe satu folder
+  echo dengan install.bat ini.
   pause
   exit /b 1
 )
 
 echo [1/3] Menyalin ConvTool.exe ke %INSTALLDIR% ...
 mkdir "%INSTALLDIR%" 2>nul
-copy /Y "%~dp0dist\ConvTool.exe" "%INSTALLDIR%\"
+copy /Y "%EXE%" "%INSTALLDIR%\"
 if errorlevel 1 (
   echo GAGAL menyalin exe.
   pause

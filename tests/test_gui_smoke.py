@@ -14,6 +14,9 @@
 #     foto tanpa kehilangan edit, Simpan + Simpan Semua)
 #   - Watermark: satu dialog untuk banyak foto (daftar foto, klik foto
 #     mengganti pratinjau)
+#   - Notif pembaruan: dialog update tampil sekali per sesi, Nanti
+#     menandai versi, Perbarui memanggil perform_update; launcher
+#     punya tombol "Periksa Pembaruan" + label versi.
 # messagebox di-patch jadi no-op supaya tidak menunggu klik.
 
 import os
@@ -316,7 +319,71 @@ def main():
     convtool_main._IPC_INBOX = None
     dlg.destroy()
 
+    print("\n== notif pembaruan (update_check) ==")
+    import update_check
+    os.environ["CONVTOOL_UPDATE_STATE_DIR"] = os.path.join(
+        WORK, "update-state")
+    update_check._PENDING = None
+    update_check._SHOWN_THIS_SESSION = False
+    fake = {"version": (1, 9, 7), "version_text": "1.9.7",
+            "tag": "v1.9.7", "notes": "- Perbaikan A",
+            "download_url": "http://127.0.0.1:1/ConvTool.exe",
+            "size": 1234}
+    asked = []
+    orig_askyesno = messagebox.askyesno
+    orig_perform = update_check.perform_update
+    try:
+        # Jawab "Nanti": dialog tampil sekali, versi ditandai.
+        messagebox.askyesno = lambda *a, **k: (asked.append(1), False)[1]
+        update_check._PENDING = dict(fake)
+        update_check.poll_and_show(root)
+        check("update dialog ditampilkan sekali", len(asked) == 1, "")
+        check("update Nanti menandai versi diberitahukan",
+              update_check._load_state().get("notified_version")
+              == "1.9.7", "")
+        update_check._PENDING = dict(fake)
+        update_check.poll_and_show(root)
+        check("update dialog tidak diulang di sesi yang sama",
+              len(asked) == 1, "")
+        # Jawab "Perbarui": perform_update dipanggil (di-stub supaya
+        # tidak mengunduh / keluar dari aplikasi).
+        performed = []
+        update_check.perform_update = (
+            lambda r, i: performed.append(i) or True)
+        messagebox.askyesno = lambda *a, **k: (asked.append(1), True)[1]
+        update_check._SHOWN_THIS_SESSION = False
+        update_check._PENDING = dict(fake)
+        update_check.poll_and_show(root)
+        check("update Perbarui memanggil perform_update",
+              len(performed) == 1
+              and performed[0]["version_text"] == "1.9.7", "")
+    finally:
+        messagebox.askyesno = orig_askyesno
+        update_check.perform_update = orig_perform
+        os.environ.pop("CONVTOOL_UPDATE_STATE_DIR", None)
+
     root.destroy()
+
+    print("\n== launcher: tombol Periksa Pembaruan + label versi ==")
+    app = convtool_main.Launcher()
+    assert_fits(app, app, "launcher")
+    labels = []
+
+    def _collect_labels(widget):
+        for child in widget.winfo_children():
+            if child.winfo_class() == "TLabel":
+                labels.append(child.cget("text"))
+            _collect_labels(child)
+
+    _collect_labels(app)
+    check("launcher label versi %s" % update_check.APP_VERSION,
+          any("Versi %s" % update_check.APP_VERSION in t for t in labels),
+          str(labels))
+    btns = [b.cget("text") for b in all_buttons(app)]
+    check("launcher tombol Periksa Pembaruan ada",
+          "Periksa Pembaruan" in btns, str(btns))
+    app.destroy()
+
     print("\n==================================")
     print("LOLOS: %d   GAGAL: %d" % (PASSES[0], len(FAILURES)))
     if FAILURES:
