@@ -1,4 +1,4 @@
-# ConvTool v1.9.0
+# ConvTool v1.9.1
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,26 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Perubahan v1.9.1 (19 Nov 2026)
+
+- **Pilih banyak foto di Explorer kini membuka SATU jendela.**
+  Akar masalahnya BUKAN di aplikasi: tanpa `MultiSelectModel`,
+  Windows Explorer memanggil command klik kanan SEKALI PER FILE
+  (satu `"%1"`) — pilih 5 foto = 5 proses ConvTool.exe = 5 dialog
+  yang muncul satu-persatu. v1.9.0 sudah membuat aplikasi membuka
+  satu dialog berisi daftar, tapi aplikasi tidak pernah menerima
+  banyak file sekaligus dari Explorer, jadi dari sisi Rif tidak
+  ada yang berubah. Kini tiap verb di `context_menu.reg.template`
+  punya `"MultiSelectModel"="Player"`, sehingga Explorer memanggil
+  command SEKALI dengan semua file terpilih sebagai argumen — lalu
+  satu dialog berisi daftar foto yang terbuka. **WAJIB jalankan
+  ulang install.bat sebagai Administrator** setelah update ini,
+  supaya registry di PC ikut berubah (registry lama tanpa
+  MultiSelectModel masih yang dipakai bila tidak di-install ulang).
+- Uji baru `test_context_menu_multiselect`: memastikan ke-7 verb
+  CommandStore punya MultiSelectModel=Player dan command-nya
+  memakai `%1`.
 
 ## Perubahan v1.9.0 (19 Nov 2026)
 

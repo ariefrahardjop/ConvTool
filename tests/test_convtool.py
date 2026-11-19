@@ -502,6 +502,44 @@ def test_fit_to_screen():
           fit_size_for_screen(50, 50, 1024, 600) == (200, 200), "")
 
 
+def test_context_menu_multiselect():
+    print("\n== context_menu MultiSelectModel ==")
+    # Akar masalah "pilih banyak foto = dialog satu-persatu": TANPA
+    # MultiSelectModel, Explorer memanggil command SEKALI PER FILE.
+    # Dengan "Player" di tiap verb CommandStore, Explorer memanggil
+    # command SEKALI dengan semua file terpilih -> satu dialog
+    # berisi daftar (EXIF Editor & Watermark v1.9.0).
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    text = open(os.path.join(root, "context_menu.reg.template"),
+                encoding="utf-8").read()
+    # Petakan tiap key -> isi barisnya.
+    sections = {}
+    current = None
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1]
+            sections[current] = []
+        elif current is not None and line:
+            sections[current].append(line)
+    verb_prefix = ("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\"
+                   "CurrentVersion\\Explorer\\CommandStore\\shell\\"
+                   "ConvTool.")
+    verbs = {k: v for k, v in sections.items()
+             if k.startswith(verb_prefix) and not k.endswith("\\command")}
+    check("context_menu 7 verb CommandStore", len(verbs) == 7,
+          str(len(verbs)))
+    for key, lines in sorted(verbs.items()):
+        name = key.split("ConvTool.")[-1]
+        check("context_menu %s MultiSelectModel=Player" % name,
+              '"MultiSelectModel"="Player"' in lines, "")
+        cmd_key = key + "\\command"
+        cmd_lines = sections.get(cmd_key, [])
+        # Di .reg, %1 tertulis ter-escape sebagai \"%1\".
+        check("context_menu %s command memakai %%1" % name,
+              any("%1" in l for l in cmd_lines), "")
+
+
 def test_preview_downscale():
     print("\n== preview_downscale ==")
     # Pratinjau dirender dari salinan kecil (maks 1200 px), bukan
@@ -537,6 +575,7 @@ def main():
     test_images_to_pdf_options()
     test_fit_within()
     test_fit_to_screen()
+    test_context_menu_multiselect()
     test_preview_downscale()
     print("\n==================================")
     print("LOLOS: %d   GAGAL: %d" % (PASSES[0], len(FAILURES)))

@@ -1,16 +1,26 @@
 Windows Registry Editor Version 5.00
 
 ; ============================================================
-; ConvTool v1 — menu klik kanan Windows Explorer.
+; ConvTool v1.9.1 — menu klik kanan Windows Explorer.
 ; File ini TEMPLATE: install.bat mengganti __INSTALLDIR__ dengan
 ; folder install sebenarnya (mis. C:\\Tools\\ConvTool) lalu
 ; menjalankan: reg import ConvTool_context_menu.reg
 ; JANGAN edit file ini langsung untuk install — jalankan install.bat.
+;
+; MultiSelectModel=Player di tiap verb CommandStore (v1.9.1):
+; TANPA nilai ini, Explorer memanggil command SEKALI PER FILE
+; (satu "%1") — pilih 5 foto = 5 proses ConvTool.exe = 5 dialog
+; yang muncul satu-persatu. Dengan "Player", Explorer memanggil
+; command SEKALI dengan semua file terpilih sebagai argumen, lalu
+; aplikasi membuka SATU dialog berisi daftar foto (v1.9.0).
+; WAJIB jalankan ulang install.bat sebagai Administrator setelah
+; update ini, supaya registry di PC ikut berubah.
 ; ============================================================
 
 ; ---------- Perintah (CommandStore, supaya bisa dipakai ulang) ----------
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.Resize]
+"MultiSelectModel"="Player"
 @="Resize Pictures"
 "MUIVerb"="Resize Pictures"
 "Icon"="__INSTALLDIR__\\ConvTool.exe"
@@ -19,6 +29,7 @@ Windows Registry Editor Version 5.00
 @="\"__INSTALLDIR__\\ConvTool.exe\" resize-image \"%1\""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.ImagesToPdf]
+"MultiSelectModel"="Player"
 @="Images to PDF"
 "MUIVerb"="Images to PDF"
 "Icon"="__INSTALLDIR__\\ConvTool.exe"
@@ -27,6 +38,7 @@ Windows Registry Editor Version 5.00
 @="\"__INSTALLDIR__\\ConvTool.exe\" images-to-pdf \"%1\""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.Exif]
+"MultiSelectModel"="Player"
 @="Edit EXIF"
 "MUIVerb"="Edit EXIF"
 "Icon"="__INSTALLDIR__\\ConvTool.exe"
@@ -35,6 +47,7 @@ Windows Registry Editor Version 5.00
 @="\"__INSTALLDIR__\\ConvTool.exe\" exif \"%1\""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.WatermarkKlasik]
+"MultiSelectModel"="Player"
 @="Watermark Klasik"
 "MUIVerb"="Watermark Klasik"
 "Icon"="__INSTALLDIR__\\ConvTool.exe"
@@ -43,6 +56,7 @@ Windows Registry Editor Version 5.00
 @="\"__INSTALLDIR__\\ConvTool.exe\" watermark-klasik \"%1\""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.WatermarkJob]
+"MultiSelectModel"="Player"
 @="Watermark Job"
 "MUIVerb"="Watermark Job"
 "Icon"="__INSTALLDIR__\\ConvTool.exe"
@@ -51,6 +65,7 @@ Windows Registry Editor Version 5.00
 @="\"__INSTALLDIR__\\ConvTool.exe\" watermark-job \"%1\""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.ResizePdf]
+"MultiSelectModel"="Player"
 @="Resize PDF"
 "MUIVerb"="Resize PDF"
 "Icon"="__INSTALLDIR__\\ConvTool.exe"
@@ -59,6 +74,7 @@ Windows Registry Editor Version 5.00
 @="\"__INSTALLDIR__\\ConvTool.exe\" resize-pdf \"%1\""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.PdfToImages]
+"MultiSelectModel"="Player"
 @="PDF to Images"
 "MUIVerb"="PDF to Images"
 "Icon"="__INSTALLDIR__\\ConvTool.exe"
