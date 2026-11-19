@@ -1,4 +1,4 @@
-# ConvTool v1.9.1
+# ConvTool v1.9.2
 
 Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 **klik kanan di Windows Explorer**. Dibangun dengan Python + tkinter
@@ -7,6 +7,31 @@ Aplikasi desktop Windows untuk 6 alat konversi & resize — dipakai lewat
 
 Bahasa UI: Indonesia (nama ukuran tetap Inggris: Small / Medium / Large /
 Phone / Custom, seperti dialog "Image Resizer for Windows").
+
+## Perubahan v1.9.2 (19 Nov 2026)
+
+- **Satu jendela beneran, meski Explorer memanggil exe sekali per
+  file.** Bukti screenshot Rif 19 Nov 08:30: 8 item terpilih, tiap
+  jendela "Foto 1 dari 1" — MultiSelectModel=Player v1.9.1 TIDAK
+  berlaku di PC itu (registry lama belum di-install ulang, atau
+  nilainya tidak dihormati untuk SubCommands). v1.9.2 tidak lagi
+  bergantung pada registry: **single-instance** (`single_instance.py`,
+  socket localhost 127.0.0.1:49190, stdlib saja). Proses pertama jadi
+  primary dan membuka SATU dialog berisi daftar; proses berikutnya
+  meneruskan file-nya ke primary (tunggu ACK, maks 2 detik) lalu
+  langsung keluar. Dialog yang sedang terbuka menerima kiriman lewat
+  `add_files()` (EXIF, Watermark, Resize, Images to PDF, PDF to
+  Images); kiriman ber-verb beda antre dan dibuka sesudah dialog
+  aktif tutup. Bila port dipakai aplikasi lain / primary mati di
+  tengah jalan, proses jalan sendiri (standalone) — file tidak hilang.
+- `cek-instalasi.bat` kini memeriksa MultiSelectModel (bagian 4b):
+  bila belum "Player", jalankan ulang install.bat sebagai Administrator.
+- Uji baru: `tests/test_single_instance.py` (13 uji: claim, forward,
+  merge, kiriman sampah diabaikan, fallback standalone) dan
+  `tests/test_e2e_single_instance.py` (2 proses nyata di Xvfb:
+  proses B keluar 0,5 detik dengan kode 0 sementara proses A tetap
+  hidup dengan dialognya). Uji GUI bertambah: `add_files` tiap dialog
+  + `_poll_ipc` menggabungkan kiriman ke dialog terbuka.
 
 ## Perubahan v1.9.1 (19 Nov 2026)
 

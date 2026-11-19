@@ -70,20 +70,9 @@ class ExifEditorDialog(tk.Toplevel):
         self.map_lon = None
 
         # ---- daftar foto (bila lebih dari satu)
+        self.file_list = None
         if len(self.files) > 1:
-            list_frame = ttk.Frame(self)
-            list_frame.pack(fill="x", padx=12, pady=(10, 0))
-            ttk.Label(list_frame, text="Foto:",
-                      font=("", 10, "bold")).pack(side="left", anchor="n")
-            self.file_list = tk.Listbox(
-                list_frame, height=min(len(self.files), 5),
-                exportselection=False)
-            for f in self.files:
-                self.file_list.insert("end", os.path.basename(f))
-            self.file_list.pack(side="left", fill="x", expand=True,
-                                padx=(6, 0))
-            self.file_list.bind("<<ListboxSelect>>", self._on_select_file)
-            self.file_list.selection_set(0)
+            self._create_file_list()
 
         # ---- isi (bisa di-scroll di layar kecil) + tombol tetap di bawah
         body = ScrollableFrame(self)
@@ -215,6 +204,47 @@ class ExifEditorDialog(tk.Toplevel):
             pass
 
     # ------------------------------------------------- ganti foto & pending
+
+    def _create_file_list(self):
+        """Buat daftar foto di atas dialog (dipanggil saat init bila
+        >1 foto, atau dari add_files saat foto kedua masuk)."""
+        list_frame = ttk.Frame(self)
+        list_frame.pack(fill="x", padx=12, pady=(10, 0))
+        ttk.Label(list_frame, text="Foto:",
+                  font=("", 10, "bold")).pack(side="left", anchor="n")
+        self.file_list = tk.Listbox(
+            list_frame, height=min(len(self.files), 5),
+            exportselection=False)
+        for f in self.files:
+            self.file_list.insert("end", os.path.basename(f))
+        self.file_list.pack(side="left", fill="x", expand=True,
+                            padx=(6, 0))
+        self.file_list.bind("<<ListboxSelect>>", self._on_select_file)
+        self.file_list.selection_set(self._current)
+
+    def add_files(self, paths):
+        """Tambah foto ke dialog yang sedang terbuka (single-instance:
+        proses lain meneruskan file-nya ke sini). Edit foto yang
+        sedang dibuka tidak terganggu; daftar hanya bertambah."""
+        new = [os.path.abspath(p) for p in paths
+               if os.path.isfile(p) and os.path.abspath(p) not in
+               [os.path.abspath(f) for f in self.files]]
+        if not new:
+            return
+        self.files.extend(new)
+        if self.file_list is None:
+            self._create_file_list()
+        else:
+            for f in new:
+                self.file_list.insert("end", os.path.basename(f))
+            self.file_list.configure(height=min(len(self.files), 5))
+        self.title("Edit EXIF — Foto %d dari %d"
+                   % (self._current + 1, len(self.files)))
+        try:
+            from ui_common import fit_to_screen
+            fit_to_screen(self)
+        except Exception:
+            pass
 
     def _pending_for(self, path):
         """Nilai edit sementara untuk satu foto (dibuat dari EXIF bila
@@ -548,4 +578,4 @@ def run_exif_editor(parent, paths):
     dlg.deiconify()
     dlg.lift()
     dlg.focus_force()
-    parent.wait_window(dlg)
+    return dlg

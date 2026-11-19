@@ -9,6 +9,15 @@
 #
 # Semua alat membuka dialog tkinter sendiri; modul ini hanya routing
 # dan launcher. Build exe: lihat build.bat (PyInstaller, --windowed).
+#
+# SINGLE-INSTANCE (single_instance.py): Explorer memanggil command
+# klik kanan SEKALI PER FILE bila MultiSelectModel tidak berlaku —
+# pilih 8 foto = 8 proses. Proses pertama menjadi primary dan membuka
+# SATU dialog berisi daftar; proses berikutnya meneruskan file-nya ke
+# primary lewat socket localhost lalu keluar. Dialog yang sedang
+# terbuka menerima file kiriman lewat add_files() (tiap dialog punya
+# metode itu); kiriman ber-verb beda antre dan dibuka sesudah dialog
+# aktif tutup.
 
 import os
 import sys
@@ -19,8 +28,14 @@ import core  # noqa: F401  (dipakai tidak langsung oleh modul dialog)
 import exif_editor
 import pdf_tools
 import resize_dialog
+import single_instance
 import watermark_dialog
 from ui_common import fit_to_screen
+
+# Dialog yang sedang terbuka + antrean kiriman single-instance.
+_ACTIVE = {"verb": None, "dialog": None}
+_PENDING = []  # [(verb, files)] ber-verb beda, dibuka sesudahnya
+_IPC_INBOX = None
 
 VERBS = {
     "resize-image", "resize-pdf", "images-to-pdf", "pdf-to-images",
@@ -41,21 +56,61 @@ def _existing_files(paths):
 
 
 def _run_verb(root, verb, files):
+    """Buka dialog untuk (verb, files) dan tunggu sampai tutup.
+    Melacak dialog aktif supaya _poll_ipc bisa menggabungkan kiriman
+    single-instance ke dalamnya."""
     if verb == "resize-image":
-        resize_dialog.run_resize_dialog(root, files, kind="image")
+        dlg = resize_dialog.run_resize_dialog(root, files, kind="image")
     elif verb == "resize-pdf":
-        resize_dialog.run_resize_dialog(root, files, kind="pdf")
+        dlg = resize_dialog.run_resize_dialog(root, files, kind="pdf")
     elif verb == "images-to-pdf":
-        pdf_tools.run_images_to_pdf(root, files)
+        dlg = pdf_tools.run_images_to_pdf(root, files)
     elif verb == "pdf-to-images":
-        pdf_tools.run_pdf_to_images(root, files)
+        dlg = pdf_tools.run_pdf_to_images(root, files)
     elif verb == "exif":
         # SATU dialog untuk semua foto (dulu: satu dialog per foto).
-        exif_editor.run_exif_editor(root, files)
+        dlg = exif_editor.run_exif_editor(root, files)
     elif verb == "watermark-klasik":
-        watermark_dialog.run_watermark_dialog(root, files, "klasik")
+        dlg = watermark_dialog.run_watermark_dialog(root, files, "klasik")
     elif verb == "watermark-job":
-        watermark_dialog.run_watermark_dialog(root, files, "job")
+        dlg = watermark_dialog.run_watermark_dialog(root, files, "job")
+    else:
+        return
+    _ACTIVE["verb"] = verb
+    _ACTIVE["dialog"] = dlg
+    try:
+        root.wait_window(dlg)
+    finally:
+        _ACTIVE["verb"] = None
+        _ACTIVE["dialog"] = None
+
+
+def _poll_ipc(root):
+    """Periksa kiriman single-instance tiap 200 md. Tiket berikutnya
+    dijadwalkan DULU (di awal) supaya rantai tetap jalan meski
+    _run_verb di bawah memblokir di wait_window (event loop bersarang
+    tetap menjalankan after)."""
+    try:
+        root.after(200, lambda: _poll_ipc(root))
+    except Exception:
+        return  # root sudah dihancurkan, rantai berhenti
+    dlg = _ACTIVE["dialog"]
+    if dlg is not None:
+        merged, pending = single_instance.merge_pending(
+            _IPC_INBOX, _ACTIVE["verb"], dlg.files)
+        if merged != dlg.files:
+            try:
+                dlg.add_files(merged)
+            except Exception:
+                pass
+        _PENDING.extend(pending)
+    else:
+        _merged, pending = single_instance.merge_pending(
+            _IPC_INBOX, None, [])
+        _PENDING.extend(pending)
+        if _PENDING:
+            verb, files = _PENDING.pop(0)
+            _run_verb(root, verb, files)
 
 
 def _pick_files(filetypes, title):
@@ -133,9 +188,16 @@ class Launcher(tk.Tk):
 
 
 def main(argv):
+    global _IPC_INBOX
     args = list(argv[1:])
     if not args:
         app = Launcher()
+        # Launcher juga jadi primary bila belum ada (supaya kiriman
+        # klik-kanan yang datang belakangan membuka dialog di sini).
+        role, inbox = single_instance.claim(None, [])
+        if role == "primary":
+            _IPC_INBOX = inbox
+            app.after(200, lambda: _poll_ipc(app))
         app.mainloop()
         return 0
     verb = args[0].lower()
@@ -161,8 +223,24 @@ def main(argv):
             % verb, parent=root)
         root.destroy()
         return 2
+    # Single-instance: proses lain yang sudah jalan menerima file ini
+    # (primary membuka satu dialog berisi daftar); proses ini keluar.
+    role, inbox = single_instance.claim(verb, files)
+    if role == "forwarded":
+        root.destroy()
+        return 0
+    _IPC_INBOX = inbox
+    root.after(200, lambda: _poll_ipc(root))
+    # Gabungkan kiriman yang sudah tiba selama startup (proses lain
+    # biasanya sudah mulai lebih dulu) sebelum dialog dibuka.
+    files, pending = single_instance.merge_pending(inbox, verb, files)
+    _PENDING.extend(pending)
     try:
         _run_verb(root, verb, files)
+        # Kiriman ber-verb beda yang antre selama dialog terbuka.
+        while _PENDING:
+            next_verb, next_files = _PENDING.pop(0)
+            _run_verb(root, next_verb, next_files)
     except Exception:
         # Exe windowed tidak menampilkan traceback: tulis ke log di
         # %TEMP% dan tampilkan di messagebox supaya kelihatan.

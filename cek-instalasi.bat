@@ -51,6 +51,18 @@ if errorlevel 1 (
 )
 
 echo.
+echo ===== 4b. MultiSelectModel (pilih banyak file = 1 jendela) =====
+reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\ConvTool.Exif" /v MultiSelectModel 2>nul
+if errorlevel 1 (
+  echo TIDAK ADA: MultiSelectModel belum terdaftar -- menu klik kanan masih memanggil exe sekali per file.
+  echo Jalankan ulang install.bat sebagai Administrator (v1.9.1 ke atas).
+) else (
+  echo ADA: nilai MultiSelectModel di atas (harusnya "Player").
+)
+echo Catatan: sejak v1.9.2 aplikasi juga menggabungkan sendiri peluncuran yang terpisah (single-instance),
+echo jadi satu jendela tetap didapat meski nilai di atas belum "Player".
+
+echo.
 echo ===== 5. Coba jalankan exe langsung =====
 if exist "C:\Tools\ConvTool\ConvTool.exe" (
   echo Membuka C:\Tools\ConvTool\ConvTool.exe ...

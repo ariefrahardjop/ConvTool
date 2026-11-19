@@ -61,6 +61,7 @@ class WatermarkDialog(tk.Toplevel):
         left = ttk.Frame(main)
         left.pack(side="left", anchor="n", fill="y", padx=(12, 0),
                   pady=(10, 12))
+        self._left_frame = left  # untuk _create_file_list dari add_files
         right = ttk.Frame(main)
         right.pack(side="left", anchor="n", fill="both", expand=True,
                    padx=(12, 12), pady=(10, 12))
@@ -89,24 +90,17 @@ class WatermarkDialog(tk.Toplevel):
             "Klasik (GPS Map Camera)" if style == "klasik"
             else "Job Timestamp"), font=("", 14, "bold"),
             foreground="#1a5fb4").pack(anchor="w", pady=(0, 2))
-        ttk.Label(left, text="%d foto dipilih. GPS & tanggal diambil "
-                             "dari EXIF tiap foto bila ada; bila tidak "
-                             "ada, dipakai isian di bawah ini."
-                  % len(self.files), wraplength=500).pack(
-                      anchor="w", pady=(0, 6))
+        self.count_var = tk.StringVar(
+            value="%d foto dipilih. GPS & tanggal diambil "
+                  "dari EXIF tiap foto bila ada; bila tidak "
+                  "ada, dipakai isian di bawah ini." % len(self.files))
+        ttk.Label(left, textvariable=self.count_var,
+                  wraplength=500).pack(anchor="w", pady=(0, 6))
 
         # Daftar foto: klik untuk melihat pratinjaunya di kanan.
+        self.file_list = None
         if len(self.files) > 1:
-            ttk.Label(left, text="Foto:",
-                      font=("", 10, "bold")).pack(anchor="w", pady=(6, 0))
-            self.file_list = tk.Listbox(
-                left, height=min(len(self.files), 5),
-                exportselection=False)
-            for f in self.files:
-                self.file_list.insert("end", os.path.basename(f))
-            self.file_list.pack(fill="x", pady=2)
-            self.file_list.bind("<<ListboxSelect>>", self._on_select_file)
-            self.file_list.selection_set(0)
+            self._create_file_list(left)
 
         form = ttk.Frame(left)
         form.pack(fill="x", pady=4)
@@ -219,6 +213,45 @@ class WatermarkDialog(tk.Toplevel):
         body.fit_to_window()
 
     # ------------------------------------------------------------- data
+
+    def _create_file_list(self, left):
+        """Buat daftar foto di kiri (dipanggil saat init bila >1 foto,
+        atau dari add_files saat foto kedua masuk)."""
+        ttk.Label(left, text="Foto:",
+                  font=("", 10, "bold")).pack(anchor="w", pady=(6, 0))
+        self.file_list = tk.Listbox(
+            left, height=min(len(self.files), 5),
+            exportselection=False)
+        for f in self.files:
+            self.file_list.insert("end", os.path.basename(f))
+        self.file_list.pack(fill="x", pady=2)
+        self.file_list.bind("<<ListboxSelect>>", self._on_select_file)
+        idx = self.files.index(self._current_file) \
+            if self._current_file in self.files else 0
+        self.file_list.selection_set(idx)
+
+    def add_files(self, paths):
+        """Tambah foto ke dialog yang sedang terbuka (single-instance:
+        proses lain meneruskan file-nya ke sini). Pratinjau yang
+        sedang tampil tidak berubah; daftar hanya bertambah."""
+        new = [os.path.abspath(p) for p in paths
+               if os.path.isfile(p) and os.path.abspath(p) not in
+               [os.path.abspath(f) for f in self.files]]
+        if not new:
+            return
+        self.files.extend(new)
+        if self.file_list is None:
+            # Daftar dibuat di frame kiri, di bawah label jumlah.
+            self._create_file_list(self._left_frame)
+        else:
+            for f in new:
+                self.file_list.insert("end", os.path.basename(f))
+            self.file_list.configure(height=min(len(self.files), 5))
+        self.count_var.set(
+            "%d foto dipilih. GPS & tanggal diambil "
+            "dari EXIF tiap foto bila ada; bila tidak "
+            "ada, dipakai isian di bawah ini." % len(self.files))
+        self._update_preview_title()
 
     def _on_select_file(self, _event=None):
         """Klik foto di daftar -> pratinjau beralih ke foto itu
@@ -470,8 +503,12 @@ class WatermarkDialog(tk.Toplevel):
 
 
 def run_watermark_dialog(parent, files, style):
+    """Buat dialog dan kembalikan; pemanggil yang menunggu
+    (wait_window) supaya convtool.py bisa melacak dialog aktif
+    untuk single-instance."""
+
     dlg = WatermarkDialog(parent, files, style)
     dlg.deiconify()
     dlg.lift()
     dlg.focus_force()
-    parent.wait_window(dlg)
+    return dlg

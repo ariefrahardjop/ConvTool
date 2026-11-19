@@ -116,6 +116,17 @@ class ImagesToPdfDialog(tk.Toplevel):
         for f in self.files:
             self.listbox.insert("end", os.path.basename(f))
 
+    def add_files(self, paths):
+        """Tambah gambar ke dialog yang sedang terbuka (single-instance:
+        proses lain meneruskan file-nya ke sini)."""
+        new = [os.path.abspath(p) for p in paths
+               if os.path.isfile(p) and os.path.abspath(p) not in
+               [os.path.abspath(f) for f in self.files]]
+        if not new:
+            return
+        self.files.extend(new)
+        self._refresh_list()
+
     def _add(self):
         chosen = filedialog.askopenfilenames(
             parent=self, title="Tambah gambar", filetypes=IMAGE_FILETYPES)
@@ -195,7 +206,8 @@ class PdfToImagesDialog(tk.Toplevel):
         info = "%d file PDF dipilih." % len(self.files)
         if len(self.files) == 1:
             info = os.path.basename(self.files[0])
-        ttk.Label(self, text=info).pack(anchor="w", padx=12, pady=(0, 4))
+        self.info_label = ttk.Label(self, text=info)
+        self.info_label.pack(anchor="w", padx=12, pady=(0, 4))
         ttk.Label(self, text="Ukuran = sisi terpanjang tiap halaman "
                              "(piksel).").pack(anchor="w", padx=12)
 
@@ -226,6 +238,18 @@ class PdfToImagesDialog(tk.Toplevel):
             side="right", padx=4)
         self.bind("<Escape>", lambda e: self.destroy())
         body.fit_to_window()
+
+    def add_files(self, paths):
+        """Tambah PDF ke dialog yang sedang terbuka (single-instance:
+        proses lain meneruskan file-nya ke sini)."""
+        new = [os.path.abspath(p) for p in paths
+               if os.path.isfile(p) and os.path.abspath(p) not in
+               [os.path.abspath(f) for f in self.files]]
+        if not new:
+            return
+        self.files.extend(new)
+        self.info_label.configure(
+            text="%d file PDF dipilih." % len(self.files))
 
     def _do_convert(self):
         tw, th = self.preset.get_target()
@@ -264,16 +288,24 @@ class PdfToImagesDialog(tk.Toplevel):
 
 
 def run_images_to_pdf(parent, files):
+    """Buat dialog dan kembalikan; pemanggil yang menunggu
+    (wait_window) supaya convtool.py bisa melacak dialog aktif
+    untuk single-instance."""
+
     dlg = ImagesToPdfDialog(parent, files)
     dlg.deiconify()
     dlg.lift()
     dlg.focus_force()
-    parent.wait_window(dlg)
+    return dlg
 
 
 def run_pdf_to_images(parent, files):
+    """Buat dialog dan kembalikan; pemanggil yang menunggu
+    (wait_window) supaya convtool.py bisa melacak dialog aktif
+    untuk single-instance."""
+
     dlg = PdfToImagesDialog(parent, files)
     dlg.deiconify()
     dlg.lift()
     dlg.focus_force()
-    parent.wait_window(dlg)
+    return dlg

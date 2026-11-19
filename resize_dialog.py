@@ -49,7 +49,8 @@ class ResizeDialog(tk.Toplevel):
         info = "%d file dipilih." % len(self.files)
         if len(self.files) == 1:
             info = os.path.basename(self.files[0])
-        ttk.Label(self, text=info).pack(anchor="w", padx=12, pady=(0, 6))
+        self.info_label = ttk.Label(self, text=info)
+        self.info_label.pack(anchor="w", padx=12, pady=(0, 6))
 
         # ---- isi (bisa di-scroll di layar kecil) + tombol tetap di bawah
         body = ScrollableFrame(self)
@@ -148,6 +149,18 @@ class ResizeDialog(tk.Toplevel):
         body.fit_to_window()
 
     # ------------------------------------------------------------- helpers
+
+    def add_files(self, paths):
+        """Tambah file ke dialog yang sedang terbuka (single-instance:
+        proses lain meneruskan file-nya ke sini)."""
+        new = [os.path.abspath(p) for p in paths
+               if os.path.isfile(p) and os.path.abspath(p) not in
+               [os.path.abspath(f) for f in self.files]]
+        if not new:
+            return
+        self.files.extend(new)
+        self.info_label.configure(
+            text="%d file dipilih." % len(self.files))
 
     def _reference_size(self):
         """Ukuran referensi untuk Custom Percent: gambar pertama
@@ -248,8 +261,12 @@ class ResizeDialog(tk.Toplevel):
 
 
 def run_resize_dialog(parent, files, kind="image"):
+    """Buat dialog dan kembalikan; pemanggil yang menunggu
+    (wait_window) supaya convtool.py bisa melacak dialog aktif
+    untuk single-instance."""
+
     dlg = ResizeDialog(parent, files, kind=kind)
     dlg.deiconify()
     dlg.lift()
     dlg.focus_force()
-    parent.wait_window(dlg)
+    return dlg

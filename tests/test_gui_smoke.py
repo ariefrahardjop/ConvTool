@@ -34,6 +34,7 @@ from PIL import Image  # noqa: E402
 import exif_editor  # noqa: E402
 import pdf_tools  # noqa: E402
 import resize_dialog  # noqa: E402
+import single_instance  # noqa: E402
 import watermark_dialog  # noqa: E402
 
 WORK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "work-gui")
@@ -190,6 +191,96 @@ def main():
           dlg._current_file == photos[1]
           and "foto 2 dari 3" in dlg.pv.cget("text"),
           dlg.pv.cget("text"))
+    dlg.destroy()
+
+    print("\n== add_files (single-instance: kiriman proses lain) ==")
+    dlg = exif_editor.ExifEditorDialog(root, photos[:1])
+    dlg.deiconify()
+    dlg.update_idletasks()
+    dlg.update()
+    check("exif 1 foto awal tanpa daftar", dlg.file_list is None, "")
+    dlg.add_files(photos[1:])
+    check("exif add_files membuat daftar 3 foto",
+          dlg.file_list is not None and dlg.file_list.size() == 3, "")
+    check("exif add_files judul jadi Foto 1 dari 3",
+          "Foto 1 dari 3" in dlg.title(), dlg.title())
+    dlg.add_files(photos[1:])  # kiriman duplikat diabaikan
+    check("exif add_files duplikat diabaikan",
+          dlg.file_list.size() == 3, "")
+    dlg.destroy()
+
+    dlg = watermark_dialog.WatermarkDialog(root, photos[:1], "klasik")
+    dlg.deiconify()
+    dlg.update_idletasks()
+    dlg.update()
+    check("watermark 1 foto awal tanpa daftar",
+          dlg.file_list is None, "")
+    dlg.add_files(photos[1:])
+    check("watermark add_files membuat daftar 3 foto",
+          dlg.file_list is not None and dlg.file_list.size() == 3, "")
+    check("watermark add_files judul pratinjau foto 1 dari 3",
+          "foto 1 dari 3" in dlg.pv.cget("text"), dlg.pv.cget("text"))
+    check("watermark add_files label jumlah 3 foto",
+          dlg.count_var.get().startswith("3 foto dipilih."),
+          dlg.count_var.get()[:20])
+    dlg.destroy()
+
+    dlg = resize_dialog.ResizeDialog(root, photos[:1], kind="image")
+    dlg.deiconify()
+    dlg.update_idletasks()
+    dlg.update()
+    dlg.add_files(photos[1:])
+    check("resize add_files label 3 file dipilih",
+          dlg.info_label.cget("text") == "3 file dipilih.",
+          dlg.info_label.cget("text"))
+    dlg.destroy()
+
+    dlg = pdf_tools.PdfToImagesDialog(root, [pdf])
+    dlg.deiconify()
+    dlg.update_idletasks()
+    dlg.update()
+    pdf2 = make_pdf(os.path.join(WORK, "dok2.pdf"))
+    pdf3 = make_pdf(os.path.join(WORK, "dok3.pdf"))
+    dlg.add_files([pdf2, pdf3])
+    check("pdf-to-images add_files label 3 file PDF",
+          dlg.info_label.cget("text") == "3 file PDF dipilih.",
+          dlg.info_label.cget("text"))
+    dlg.destroy()
+
+    dlg = pdf_tools.ImagesToPdfDialog(root, photos[:1])
+    dlg.deiconify()
+    dlg.update_idletasks()
+    dlg.update()
+    dlg.add_files(photos[1:])
+    check("images-to-pdf add_files listbox 3",
+          dlg.listbox.size() == 3, "")
+    dlg.destroy()
+
+    print("\n== _poll_ipc menggabungkan kiriman ke dialog terbuka ==")
+    import convtool as convtool_main
+    role, inbox = single_instance.claim("exif", photos[:1])
+    check("smoke claim primary", role == "primary", role)
+    convtool_main._IPC_INBOX = inbox
+    dlg = exif_editor.ExifEditorDialog(root, photos[:1])
+    dlg.deiconify()
+    dlg.update_idletasks()
+    dlg.update()
+    convtool_main._ACTIVE["verb"] = "exif"
+    convtool_main._ACTIVE["dialog"] = dlg
+    inbox.put(("exif", photos[1:]))
+    inbox.put(("watermark-klasik", photos[1:]))
+    convtool_main._poll_ipc(root)
+    dlg.update_idletasks()
+    check("poll_ipc gabung kiriman verb sama ke daftar",
+          dlg.file_list is not None and dlg.file_list.size() == 3, "")
+    check("poll_ipc kiriman verb beda antre pending",
+          len(convtool_main._PENDING) == 1
+          and convtool_main._PENDING[0][0] == "watermark-klasik",
+          str(convtool_main._PENDING))
+    convtool_main._ACTIVE["verb"] = None
+    convtool_main._ACTIVE["dialog"] = None
+    convtool_main._PENDING.clear()
+    convtool_main._IPC_INBOX = None
     dlg.destroy()
 
     root.destroy()
