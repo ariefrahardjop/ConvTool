@@ -193,29 +193,51 @@ def main():
           dlg.pv.cget("text"))
     dlg.destroy()
 
-    print("\n== add_files (single-instance: kiriman proses lain) ==")
+    print("\n== sidebar Varian B + toggle (exif) ==")
     dlg = exif_editor.ExifEditorDialog(root, photos[:1])
     dlg.deiconify()
     dlg.update_idletasks()
     dlg.update()
-    # Daftar SELALU ada di atas sejak init (bahkan untuk 1 foto),
-    # dan ter-pack SEBELUM isi + tombol: pack_slaves()[0] = frame daftar.
-    check("exif 1 foto awal daftar sudah ada di atas",
-          dlg.file_list is not None and dlg.file_list.size() == 1
-          and dlg.pack_slaves()[0] is dlg._list_frame, "")
-    check("exif tombol tetap paling bawah",
-          dlg.pack_slaves()[-1].winfo_children()[0].cget("text")
-          == "Simpan", "")
+    # Sidebar kiri: anak pertama main, berisi 1 foto; tombol »
+    # belum ter-pack (sidebar sedang tampil).
+    check("exif sidebar anak pertama main",
+          dlg._main_frame.pack_slaves()[0] is dlg._sidebar, "")
+    check("exif sidebar 1 foto awal",
+          dlg.file_list is not None and dlg.file_list.size() == 1, "")
+    check("exif sidebar judul Foto (1)",
+          dlg._sidebar_title_var.get() == "Foto (1)",
+          dlg._sidebar_title_var.get())
+    check("exif tombol tampilkan belum ter-pack",
+          dlg._show_sidebar_btn.winfo_manager() == "", "")
     dlg.add_files(photos[1:])
     check("exif add_files membuat daftar 3 foto",
-          dlg.file_list is not None and dlg.file_list.size() == 3, "")
-    check("exif add_files daftar TETAP di atas",
-          dlg.pack_slaves()[0] is dlg._list_frame, "")
-    check("exif add_files judul jadi Foto 1 dari 3",
+          dlg.file_list.size() == 3, "")
+    check("exif add_files judul sidebar Foto (3)",
+          dlg._sidebar_title_var.get() == "Foto (3)",
+          dlg._sidebar_title_var.get())
+    check("exif add_files judul jendela Foto 1 dari 3",
           "Foto 1 dari 3" in dlg.title(), dlg.title())
     dlg.add_files(photos[1:])  # kiriman duplikat diabaikan
     check("exif add_files duplikat diabaikan",
           dlg.file_list.size() == 3, "")
+    # Toggle: sembunyikan -> sidebar lepas dari pack, tombol » muncul.
+    dlg._hide_sidebar()
+    dlg.update_idletasks()
+    check("exif sembunyikan sidebar lepas dari pack",
+          dlg._sidebar.winfo_manager() == "", "")
+    check("exif sembunyikan tombol » ter-pack",
+          dlg._show_sidebar_btn.winfo_manager() == "pack", "")
+    check("exif sembunyikan daftar tetap 3 foto",
+          dlg.file_list.size() == 3, "")
+    # Toggle: tampilkan lagi -> sidebar kembali paling kiri.
+    dlg._show_sidebar()
+    dlg.update_idletasks()
+    check("exif tampilkan sidebar kembali ter-pack",
+          dlg._sidebar.winfo_manager() == "pack", "")
+    check("exif tampilkan sidebar kembali paling kiri",
+          dlg._main_frame.pack_slaves()[0] is dlg._sidebar, "")
+    check("exif tampilkan tombol » lepas lagi",
+          dlg._show_sidebar_btn.winfo_manager() == "", "")
     dlg.destroy()
 
     dlg = watermark_dialog.WatermarkDialog(root, photos[:1], "klasik")

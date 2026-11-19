@@ -69,13 +69,6 @@ class ExifEditorDialog(tk.Toplevel):
         self.map_lat = None
         self.map_lon = None
 
-        # ---- daftar foto: SELALU di atas (di luar area scroll), supaya
-        # posisinya tetap walau foto lain masuk belakangan lewat
-        # single-instance. Dulu daftar dibuat hanya bila >1 foto, dan
-        # bila dibuat belakangan dari add_files ia ter-pack PALING
-        # BAWAH, di bawah tombol (screenshot Rif 19 Nov 09:01).
-        self._create_file_list()
-
         # ---- isi (bisa di-scroll di layar kecil) + tombol tetap di bawah
         body = ScrollableFrame(self)
         body.pack(fill="both", expand=True)
@@ -84,10 +77,20 @@ class ExifEditorDialog(tk.Toplevel):
 
         main = ttk.Frame(inner)
         main.pack(fill="both", expand=True, padx=12, pady=10)
+        self._main_frame = main
 
-        # ---- kiri: pratinjau foto
+        # ---- sidebar kiri: daftar foto — Varian B (mockup 19 Nov,
+        # dipilih Rif). Pratinjau di tengah, form + peta di kanan.
+        # Daftar bisa di-toggle sembunyi/tampil (tombol « di kepala
+        # sidebar, tombol » di tepi kiri saat tersembunyi). Dulu daftar
+        # selebar jendela di ATAS dialog (v1.9.4) — jelek, menutupi
+        # dan memanjang (screenshot Rif 19 Nov 09:37).
+        self._create_sidebar()
+
+        # ---- tengah: pratinjau foto
         left = ttk.Frame(main)
         left.pack(side="left", anchor="n", padx=(0, 12))
+        self._preview_frame = left
         self.preview_label = ttk.Label(left, text="")
         self.preview_label.pack()
         self.filename_label = ttk.Label(left, text="", wraplength=340)
@@ -207,34 +210,70 @@ class ExifEditorDialog(tk.Toplevel):
 
     # ------------------------------------------------- ganti foto & pending
 
-    def _create_file_list(self):
-        """Buat daftar foto di ATAS dialog (di luar area scroll).
-        Dipanggil sekali saat init — selalu, bahkan untuk 1 foto —
-        supaya posisinya tidak pernah pindah saat foto lain masuk."""
-        list_frame = ttk.Frame(self)
-        list_frame.pack(fill="x", padx=12, pady=(10, 0))
-        self._list_frame = list_frame
-        ttk.Label(list_frame, text="Foto:",
-                  font=("", 10, "bold")).pack(side="left", anchor="n")
-        self.file_list = tk.Listbox(
-            list_frame, height=min(max(len(self.files), 1), 5),
-            exportselection=False)
+    def _create_sidebar(self):
+        """Buat sidebar kiri berisi daftar foto (Varian B). Dipanggil
+        sekali saat init — selalu, bahkan untuk 1 foto — supaya
+        posisinya tidak pernah pindah saat foto lain masuk lewat
+        single-instance. Daftar memanjang mengikuti tinggi kolom
+        pratinjau/form; scrollbar bila foto > muat."""
+        sidebar = ttk.Frame(self._main_frame)
+        sidebar.pack(side="left", anchor="n", fill="y", padx=(0, 12))
+        self._sidebar = sidebar
+        header = ttk.Frame(sidebar)
+        header.pack(fill="x")
+        self._sidebar_title_var = tk.StringVar(
+            value="Foto (%d)" % len(self.files))
+        ttk.Label(header, textvariable=self._sidebar_title_var,
+                  font=("", 10, "bold")).pack(side="left")
+        ttk.Button(header, text="«", width=2,
+                   command=self._hide_sidebar).pack(side="right")
+        self.file_list = tk.Listbox(sidebar, width=30, height=8,
+                                    exportselection=False)
         for f in self.files:
             self.file_list.insert("end", os.path.basename(f))
-        self.file_list.pack(side="left", fill="x", expand=True,
-                            padx=(6, 0))
-        scroll = ttk.Scrollbar(list_frame, orient="vertical",
+        self.file_list.pack(side="left", fill="both", expand=True)
+        scroll = ttk.Scrollbar(sidebar, orient="vertical",
                                command=self.file_list.yview)
         self.file_list.configure(yscrollcommand=scroll.set)
         scroll.pack(side="left", fill="y")
         self.file_list.bind("<<ListboxSelect>>", self._on_select_file)
         self.file_list.selection_set(self._current)
+        # Tombol tampilkan-kembali: hanya muncul saat sidebar
+        # disembunyikan (di tepi kiri, sebelum pratinjau).
+        self._show_sidebar_btn = ttk.Button(
+            self._main_frame, text="»", width=2,
+            command=self._show_sidebar)
+
+    def _hide_sidebar(self):
+        """Sembunyikan sidebar daftar foto; tombol » muncul di tepi
+        kiri untuk menampilkannya lagi. Dialog menyempit mengikuti."""
+        self._sidebar.pack_forget()
+        self._show_sidebar_btn.pack(side="left", anchor="n",
+                                    padx=(0, 6),
+                                    before=self._preview_frame)
+        try:
+            from ui_common import fit_to_screen
+            fit_to_screen(self)
+        except Exception:
+            pass
+
+    def _show_sidebar(self):
+        """Tampilkan lagi sidebar daftar foto di posisi semula
+        (paling kiri, sebelum pratinjau)."""
+        self._show_sidebar_btn.pack_forget()
+        self._sidebar.pack(side="left", anchor="n", fill="y",
+                           padx=(0, 12), before=self._preview_frame)
+        try:
+            from ui_common import fit_to_screen
+            fit_to_screen(self)
+        except Exception:
+            pass
 
     def add_files(self, paths):
         """Tambah foto ke dialog yang sedang terbuka (single-instance:
-        proses lain meneruskan file-nya ke sini). Daftar sudah ada di
-        atas sejak init — di sini hanya menambah baris. Edit foto yang
-        sedang dibuka tidak terganggu."""
+        proses lain meneruskan file-nya ke sini). Sidebar sudah ada
+        sejak init — di sini hanya menambah baris + jumlah di kepala.
+        Edit foto yang sedang dibuka tidak terganggu."""
         new = [os.path.abspath(p) for p in paths
                if os.path.isfile(p) and os.path.abspath(p) not in
                [os.path.abspath(f) for f in self.files]]
@@ -243,7 +282,7 @@ class ExifEditorDialog(tk.Toplevel):
         self.files.extend(new)
         for f in new:
             self.file_list.insert("end", os.path.basename(f))
-        self.file_list.configure(height=min(len(self.files), 5))
+        self._sidebar_title_var.set("Foto (%d)" % len(self.files))
         self.title("Edit EXIF — Foto %d dari %d"
                    % (self._current + 1, len(self.files)))
         try:
